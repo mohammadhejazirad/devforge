@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "devforge"
+version = "1.0.0"
+description = "Terminal-based developer-environment provisioning and version management for Linux."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["linux", "devops", "provisioning", "toolchain", "version-manager"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: System :: Installation/Setup",
+  "Topic :: System :: Systems Administration",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  # mypy 2.x refuses a 3.9 target, and mypy 1.x does not run on Python 3.14.
+  "mypy>=1.13,<2; python_version < '3.14'",
+  # pytest 9 requires Python 3.10+.
+  "pytest>=8,<9; python_version < '3.10'",
+  "pytest>=8; python_version >= '3.10'",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+devforge = "devforge.cli:entrypoint"
+
+[tool.setuptools]
+packages = [
+  "devforge",
+  "devforge.commands",
+  "devforge.core",
+  "devforge.data",
+  "devforge.tools",
+]
+
+[tool.setuptools.package-data]
+devforge = ["data/**/*.json", "data/**/*.md"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+src = ["devforge", "tests"]
+extend-exclude = [".docs"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["devforge"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+warn_unreachable = true
+show_error_codes = true
+files = ["devforge", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["."]
+
