@@ -17,7 +17,7 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 - [x] Package layout: `devforge/{__init__,__main__,cli}.py`, `core/`, `tools/`, `data/`, `tests/`, `docs/`
 - [x] Centralized English strings + output markers (`[ok]`/`[warn]`/`[err]`, `NO_COLOR`, non-TTY)
 - [x] `core/log.py`: log file under `~/.local/state/devforge/logs/`, secret redaction
-- [ ] CI: the 1.0.0 push ran on GitHub Actions and failed. Python 3.9 and 3.14 passed. mypy parsed pytest 9 (`match`, Python 3.10+) under a 3.9 target, and shfmt rejected the four-space `install.sh`. The follow-up commit fixes both. This box stays open until that run is green.
+- [x] CI: GitHub Actions run [39857141012](https://github.com/mohammadhejazirad/devforge/actions/runs/39857141012) on `main` (`d01592f`) passed: Python 3.9, Python 3.14, mypy on 3.12, shellcheck, and shfmt. The first 1.0.0 push failed and that follow-up fixed it.
 - [x] Verify: `python -m devforge --help` works; ruff/mypy/pytest pass locally
 
 ## Phase 2 — Environment detection (`core/system.py`)
@@ -103,7 +103,7 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 - What: `shfmt` in CI now uses `-i 4 -ci`, which matches `install.sh`. mypy skips the pytest package so pytest 9 syntax is not parsed as Python 3.9. `tests` is a package, so the existing `tests.*` mypy override applies, including untyped pytest decorators.
 - Files: `.github/workflows/ci.yml`, `pyproject.toml`, `tests/__init__.py`, `tasks.md`.
 - Verification: local ruff and pytest (44 passed) on Python 3.14.4. shellcheck 0.10.0 and `shfmt -i 4 -ci -d` are clean. mypy 1.20.2 on Python 3.12 in `python:3.12-slim`, with wheels downloaded on the host, reported no issues. The container has no curl, so its install tests are not the host result.
-- Not done: the GitHub Actions re-run is the remaining check. The release archive is unchanged because these files are not inside it.
+- GitHub Actions run 39857141012 on `main` commit `d01592f` passed (Python 3.9, Python 3.14, mypy on 3.12, shellcheck, shfmt). The release archive is unchanged because these files are not inside it.
 
 ---
 
