@@ -80,6 +80,13 @@ files = ["devforge", "tests"]
 [[tool.mypy.overrides]]
 module = ["tests.*"]
 disallow_untyped_defs = false
+disallow_untyped_decorators = false
+
+# pytest 9 uses match statements. mypy targets 3.9, so it must not parse pytest.
+[[tool.mypy.overrides]]
+module = ["pytest", "pytest.*", "_pytest", "_pytest.*"]
+follow_imports = "skip"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

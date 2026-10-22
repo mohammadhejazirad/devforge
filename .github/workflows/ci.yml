@@ -67,4 +67,5 @@ jobs:
             exit 0
           fi
           shellcheck "${files[@]}"
-          shfmt -d "${files[@]}"
+          # install.sh uses four spaces and indented case arms.
+          shfmt -i 4 -ci -d "${files[@]}"
