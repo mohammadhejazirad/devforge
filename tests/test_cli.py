@@ -75,10 +75,34 @@ def test_no_color_flag_disables_marker_color(monkeypatch: pytest.MonkeyPatch) ->
 def test_auto_color_on_tty_stderr(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("NO_COLOR", raising=False)
     monkeypatch.setenv("TERM", "xterm-256color")
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
     err = _Tty()
     code = main([], out=_Tty(), err=err)
     assert code == 2
     assert "\x1b[31m[err]" in err.getvalue()
+
+
+def test_bare_command_on_a_tty_opens_the_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    seen: dict[str, bool] = {}
+
+    def fake(ctx: object, force: bool = False) -> int:
+        del ctx
+        seen["force"] = force
+        return 0
+
+    monkeypatch.setattr("devforge.cli.cmd_tui", fake)
+    code = main([], out=_Tty(), err=_Tty())
+    assert code == 0
+    assert seen["force"] is True
+
+
+def test_flags_on_a_tty_do_not_open_the_menu(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys.stdin, "isatty", lambda: True)
+    err = _Tty()
+    code = main(["--dry-run"], out=_Tty(), err=err)
+    assert code == 2
+    assert "[err] No command was given." in err.getvalue()
 
 
 def test_help_does_not_write_state(

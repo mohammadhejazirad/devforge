@@ -6,7 +6,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TextIO
+from typing import IO, TextIO
 
 from devforge import __version__
 from devforge import strings as s
@@ -29,6 +29,7 @@ from devforge.commands.network import (
     cmd_mirror_set,
     cmd_mirror_test,
 )
+from devforge.commands.release import cmd_self_update
 from devforge.context import Context, make_context
 from devforge.tools.base import Scope
 from devforge.tui import cmd_tui
@@ -157,6 +158,10 @@ def build_parser() -> argparse.ArgumentParser:
     shell_cmds.add_parser("remove", help="Remove the managed block from the shell rc file.")
 
     commands.add_parser("tui", help="Open a numbered menu. Requires a terminal.")
+    commands.add_parser(
+        "self-update",
+        help="Install a newer DevForge release. Managed tools are left in place.",
+    )
     return parser
 
 
@@ -168,7 +173,8 @@ def main(
 ) -> int:
     """Run DevForge. Returns a process status code."""
     parser = build_parser()
-    args = parser.parse_args(None if argv is None else list(argv))
+    supplied = list(sys.argv[1:] if argv is None else argv)
+    args = parser.parse_args(supplied)
     printer = Printer.create(
         no_color=args.no_color,
         quiet=args.quiet,
@@ -179,6 +185,20 @@ def main(
         err=err,
     )
     if not args.command:
+        if not supplied and _menu_tty(printer.stream):
+            ctx = make_context(
+                printer,
+                dry_run=args.dry_run,
+                assume_yes=args.yes,
+                as_json=args.json,
+                offline=False,
+            )
+            ctx.log.info("devforge")
+            try:
+                return cmd_tui(ctx, force=True)
+            except KeyboardInterrupt:
+                printer.error(s.ERR_INTERRUPTED)
+                return 1
         printer.error(s.ERR_NO_COMMAND)
         parser.print_help(printer.error_stream)
         return 2
@@ -247,6 +267,8 @@ def _dispatch(ctx: Context, args: argparse.Namespace) -> int:
         return cmd_shell(ctx, str(args.shell_action))
     if command == "tui":
         return cmd_tui(ctx)
+    if command == "self-update":
+        return cmd_self_update(ctx)
     ctx.printer.error(s.ERR_UNKNOWN_COMMAND.format(name=command))
     return 2
 
@@ -277,6 +299,14 @@ def _dns(ctx: Context, args: argparse.Namespace) -> int:
         return cmd_dns_restore(ctx)
     ctx.printer.error(s.ERR_UNKNOWN_COMMAND.format(name=action))
     return 2
+
+
+def _menu_tty(stream: IO[str]) -> bool:
+    """True when both stdin and the output stream are terminals."""
+    try:
+        return bool(sys.stdin.isatty() and stream.isatty())
+    except (AttributeError, ValueError):
+        return False
 
 
 def entrypoint() -> None:

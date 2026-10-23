@@ -6,9 +6,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
 set -eu
 
-VERSION="1.0.0"
-DEFAULT_URL="https://github.com/mohammadhejazirad/devforge/releases/download/v1.0.0/devforge-1.0.0.tar.gz"
-DEFAULT_SHA256="0edf8516776568e607898ba573cb8272a841589d1296a4cdfe97fc5affd654c9"
+VERSION="1.1.0"
+DEFAULT_URL="https://github.com/mohammadhejazirad/devforge/releases/download/v1.1.0/devforge-1.1.0.tar.gz"
+DEFAULT_SHA256="544355dd879e2e0db29b5d74f80a8a4a0236c7152dc74d8a1dd4336a3a45a640"
 
 URL="${DEVFORGE_RELEASE_URL:-$DEFAULT_URL}"
 SHA256="${DEVFORGE_RELEASE_SHA256:-$DEFAULT_SHA256}"
@@ -166,9 +166,11 @@ if [ -e "$DEST" ]; then
     if [ ! -f "$DEST/.devforge-install" ] && [ ! -d "$DEST/devforge" ]; then
         die "refusing to replace $DEST because it is not a DevForge install"
     fi
-    rm -rf "$DEST"
 fi
 mkdir -p "$DEST" "$BIN_DIR"
+# Replace the program only. tools/, shims/, and env.sh live in this directory
+# and must survive a reinstall.
+rm -rf "$DEST/devforge"
 cp -a "$src/devforge" "$DEST/devforge"
 if [ -f "$src/LICENSE" ]; then
     cp -a "$src/LICENSE" "$DEST/LICENSE"

@@ -4,9 +4,9 @@
 - [guide.fa.md](guide.fa.md) is the same guide in Persian.
 - [architecture.md](architecture.md) records how the code is split.
 
-The published `install.sh` still installs release 1.0.0. That release prints
-help and version only. The tool manager in this tree is what `python3 -m
-devforge` runs from a checkout.
+The published `install.sh` installs release 1.1.0, including the tool manager
+and the terminal menu. `devforge self-update` installs a later release without
+removing managed tools.
 
 The agent specification is in `.docs/AGENTS.md` (English, source of truth) and
 `.docs/AGENTS.fa.md` (Persian).

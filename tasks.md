@@ -60,13 +60,13 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 - [x] `tui.py`: stdlib interactive menus; hide GUI-only options on servers
 - [x] Presets (`web-php`, `node-fullstack`, `go-backend`, `devops`) + `devforge apply <file>` / export
 - [x] `install.sh`: POSIX sh, python3 >= 3.9 check (install with consent), pinned release, SHA256 verify, `~/.local/share/devforge` + symlink
-- [x] shellcheck + container test with/without python3 (CI) — done for the 1.0.0 installer; `install.sh` was not changed in 1.1.0
+- [x] shellcheck + container test with/without python3 (CI). `install.sh` for 1.1.0 no longer deletes the whole install directory on reinstall.
 
 ## Later
 
 - [x] Remaining tools (Rust, Java, Ruby, .NET, Bun, Deno, databases, infra tools) — planned and covered by the dry-run catalog test
 - [ ] Container integration-test matrix in GitHub Actions
-- [ ] Release packaging for 1.1.0, checksums, signatures. `install.sh` stays pinned to the published 1.0.0 archive.
+- [x] Release packaging for 1.1.0. `install.sh` pins `devforge-1.1.0.tar.gz` and `SHA256SUMS` is attached to the GitHub release. There is no separate signature file.
 
 ---
 
@@ -111,7 +111,15 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 - Files: `devforge/core/*`, `devforge/tools/*`, `devforge/commands/*`, `devforge/cli.py`, `devforge/tui.py`, `devforge/data/**`, `tests/test_system.py`, `tests/test_manager.py`, `tests/fixtures/os-release/*`, `README.md`, `docs/guide.fa.md`, `docs/architecture.md`, `pyproject.toml`, `devforge/__init__.py`, `tests/test_install.py`.
 - Verification: ruff check and ruff format on Python 3.14.4. pytest passed (the suite that includes the old CLI/install tests plus distro fixtures, a plan for all 35 tools on Debian and Alpine, PHP 8.4 package names, the Node LTS archive, mirror/DNS round-trip under a temp root, and the CLI). mypy 1.20.2 on Python 3.12 reported no issues in 79 files. No package install and no host DNS change were run.
 - Assumptions: shims for official archives; distro packages plus Debian alternatives for PHP and Java; Python does not retarget `/usr/bin/python3`; nvm and pyenv are detected and not installed; Rust uses a checksummed `rustup-init` unless rustup is already on PATH; .NET is package-only and blocked on Debian and Alpine; Iranian mirrors and the non-Cloudflare/Google DNS presets are unverified; apply accepts JSON and a small TOML subset; HTTP Range resume is not implemented; Go's CDN may 404 in this region and that stays a download error.
-- Not done: a 1.1.0 GitHub release, so the curl installer still installs 1.0.0. No container matrix. Service names are a single default list, so a distro whose unit is not `redis` or `mysql` can fail that one systemctl step.
+- Not done in that pass: a 1.1.0 GitHub release. No container matrix. Service names are a single default list, so a distro whose unit is not `redis` or `mysql` can fail that one systemctl step.
+
+### 2026-10-23 — Menu and release 1.1.0
+
+- What: `devforge` with no arguments opens the full menu on a terminal. Flags alone, and a non-terminal, still print help and exit 2. The menu lists every tool and the actions (install, update, switch, pin, uninstall, doctor, presets, mirrors, DNS, shell, self-update). It says when a newer GitHub release exists. `devforge self-update` downloads that release, checks `SHA256SUMS`, and replaces only the program files. A git checkout is left alone. `install.sh` pins release 1.1.0 and no longer deletes `tools/`, `shims/`, or `env.sh` on reinstall.
+- Files: `devforge/tui.py`, `devforge/cli.py`, `devforge/strings.py`, `devforge/core/release.py`, `devforge/commands/release.py`, `install.sh`, `tests/test_cli.py`, `tests/test_install.py`, `tests/test_manager.py`, `tests/test_release.py`, `README.md`, `docs/guide.fa.md`, `docs/architecture.md`, `docs/README.md`, `tasks.md`.
+- Verification: ruff check on Python 3.14.4. pytest passed. mypy 1.20.2 on Python 3.12 reported no issues in 82 files. A PTY smoke of bare `devforge` showed the menu, including installed PHP 8.5.12 and Node 24.22.1 with a newer known line, and exited on `0`. `self-update` in this checkout refused to overwrite it. Non-TTY `devforge` exited 2. Archive SHA256 `544355dd879e2e0db29b5d74f80a8a4a0236c7152dc74d8a1dd4336a3a45a640`.
+- Release: https://github.com/mohammadhejazirad/devforge/releases/tag/v1.1.0
+- Not done: container matrix. No detached signature. `shellcheck` and `shfmt` were not installed on this host; CI runs both.
 
 ---
 
@@ -125,7 +133,7 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 6. **Packaging:** `pyproject.toml` with setuptools and zero runtime dependencies. Dev tools (ruff, mypy, pytest) go in an optional `dev` extra only.
 7. **Side effects:** system-touching code will take injectable runners and root paths so tests never touch the host.
 8. **License:** MIT for the 1.0.0 public release. The spec allowed MIT or Apache-2.0 and the maintainer had not chosen; a public installer cannot ship with no license. Apache-2.0 can replace it later if the maintainer prefers.
-9. **Version:** `1.0.0` remains the published installer archive. The tree is `1.1.0` and includes the tool manager. `install.sh` must keep the 1.0.0 URL and SHA256 until a new release is cut. The pin test checks that the pin is well-formed and that a rebuild is deterministic; it does not require the current tree to hash to the published pin.
+9. **Version:** Release `1.1.0` is the published installer archive. `install.sh` pins `v1.1.0` and SHA256 `544355dd879e2e0db29b5d74f80a8a4a0236c7152dc74d8a1dd4336a3a45a640`. The pin test rebuilds this tree and requires the digest to match. A later release must update the pin only after its archive is built. `self-update` and a reinstall replace the program files and leave managed tools in place.
 10. **CI Python:** pytest and ruff on 3.9 and 3.14. This machine is 3.14.4, so 3.14 is the pinned "latest" rather than a floating version. mypy stays on the 1.x line (`mypy>=1.13,<2`) because mypy 2 refuses a 3.9 target, and that line does not run on Python 3.14, so the mypy job uses Python 3.12. pytest is pinned to `<9` only on Python 3.9, because pytest 9 requires Python 3.10+. mypy does not parse pytest, and `shfmt` checks `install.sh` with `-i 4 -ci`.
 11. **Log path:** `$XDG_STATE_HOME/devforge/logs/devforge.log` when that variable is absolute, otherwise `~/.local/state/devforge/logs/devforge.log`. Relative XDG values are ignored. Append-only, with a 2MB rotation. Directory mode `0700`, file mode `0600`. Newlines in a message are folded into one line. A logging failure disables that logger and does not crash the program.
 12. **Markers:** `[ok]` and `[info]` go to stdout. `[warn]` and `[err]` go to stderr. Color is on when stdout is a TTY, unless `NO_COLOR` is set, `TERM=dumb`, or `--no-color` is passed. `FORCE_COLOR` turns color on for a non-TTY. Help text from argparse is always plain, including on Python 3.14.

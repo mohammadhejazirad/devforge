@@ -290,7 +290,34 @@ def test_shim_rejects_a_flag_version() -> None:
 def test_menu_exits_on_zero(tmp_path: Path) -> None:
     ctx, out, _err = machine(tmp_path, "debian-12", family="debian")
     assert menu(ctx, iter(["0"])) == 0
-    assert "DevForge" in out.getvalue()
+    text = out.getvalue()
+    assert "DevForge" in text
+    assert "php" in text
+    assert "node" in text
+    assert "Update DevForge" in text
+    assert "not installed" in text
+
+
+def test_menu_opens_a_tool_then_returns(tmp_path: Path) -> None:
+    ctx, out, _err = machine(tmp_path, "debian-12", family="debian")
+    assert menu(ctx, iter(["1", "0", "0"])) == 0
+    text = out.getvalue()
+    assert "Install the preferred version" in text
+    assert "back" in text
+
+
+def test_menu_shows_a_newer_release(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from devforge.core.release import ReleaseNotice
+
+    notice = ReleaseNotice(
+        "9.9.9",
+        "https://github.com/mohammadhejazirad/devforge/releases/download/v9.9.9/devforge-9.9.9.tar.gz",
+        "https://github.com/mohammadhejazirad/devforge/releases/download/v9.9.9/SHA256SUMS",
+    )
+    monkeypatch.setattr("devforge.tui.check_newer", lambda ctx: notice)
+    ctx, out, _err = machine(tmp_path, "debian-12", family="debian")
+    assert menu(ctx, iter(["0"])) == 0
+    assert "A new version is available: 9.9.9" in out.getvalue()
 
 
 def test_cli_dispatch_uses_a_private_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -46,13 +46,16 @@ MARK_STEP = "==>"
 
 DESCRIPTION = (
     "Provision Linux development tools and switch their versions. "
-    "Every change is shown as a plan before it runs."
+    "Every change is shown as a plan before it runs. "
+    "Run devforge with no arguments in a terminal to open the menu."
 )
 
 HELP_EXAMPLES = """
 Examples:
+  devforge
   devforge --help
   devforge --version
+  devforge self-update
   devforge info
   devforge status
   devforge status php
@@ -78,5 +81,21 @@ HELP_QUIET = "Hide informational lines. Warnings and errors are still shown."
 HELP_VERBOSE = "Show more detail. Repeat for more."
 
 ERR_NO_COMMAND = "No command was given. Run devforge --help to see usage."
+ERR_MENU_NEEDS_TTY = "The menu needs a terminal. Pass a command, for example: devforge --help"
+ERR_UPDATE_OFFLINE = "Cannot check for DevForge updates while offline."
+
+INFO_CHECKOUT_UPDATE = (
+    "This copy is a source checkout. Update it with git pull, "
+    "or install a release with install.sh. DevForge will not overwrite a checkout."
+)
+INFO_RELEASE_AVAILABLE = (
+    'A new version is available: {version}. Choose "Update DevForge" to install it.'
+)
+INFO_RELEASE_READY = "DevForge {version} is available (you have {current})."
+
+OK_RELEASE_CURRENT = "DevForge {version} is already the newest release."
+OK_SELF_UPDATED = "Updated DevForge to {version}. Open a new command to use it."
+
+PROMPT_SELF_UPDATE = "Install this DevForge update?"
 
 VERSION_TEMPLATE = "devforge {version}"

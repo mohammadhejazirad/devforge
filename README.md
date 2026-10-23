@@ -5,11 +5,7 @@ Linux. It detects the machine, shows a plan, and changes the system only after
 you confirm. The same commands work on a desktop and on a server.
 
 This tree is **version 1.1.0**. It manages languages, package tools,
-infrastructure, databases, and everyday utilities.
-
-The published one-line installer still installs **release 1.0.0**. That
-release only prints help and version. Use a checkout of this tree, described
-below, until a newer release is published. A Persian walkthrough is in
+infrastructure, databases, and everyday utilities. A Persian walkthrough is in
 [docs/guide.fa.md](docs/guide.fa.md).
 
 ## Requirements
@@ -39,17 +35,19 @@ devforge --version
 
 That prints `devforge 1.1.0` from this tree.
 
-### Published installer (release 1.0.0)
+### Published installer (release 1.1.0)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
 ```
 
-`install.sh` downloads `devforge-1.0.0.tar.gz` from the GitHub release, checks
+`install.sh` downloads `devforge-1.1.0.tar.gz` from the GitHub release, checks
 the SHA256 pinned in the script, and installs into `~/.local` (or `/usr/local`
-when run as root). It does not run any other remote script. That archive does
-not include the tool manager yet. Do not expect `devforge install` from the
-curl command until a release newer than 1.0.0 is published.
+when run as root). It does not run any other remote script. Running it again
+replaces the program and leaves `tools/`, `shims/`, and `env.sh` in place.
+
+If you still have the old 1.0.0 command, run `install.sh` once more. That
+release cannot update itself. From 1.1.0 on, use `devforge self-update`.
 
 ## What you can manage
 
@@ -111,7 +109,8 @@ devforge update --all
 devforge uninstall node 22.23.4
 devforge shell install
 devforge shell remove
-devforge tui
+devforge
+devforge self-update
 ```
 
 `status php` prints the installed version, where it came from (`system` or
@@ -166,8 +165,30 @@ devforge --dry-run preset apply web-php
 | `go-backend` | go, git, docker |
 | `devops` | docker, kubectl, helm, terraform, git, jq |
 
-`devforge tui` opens a numbered menu on a terminal. With no command, DevForge
-prints help and exits 2. It does not open the menu.
+Run `devforge` with no arguments in a terminal to open the menu. It lists every
+tool, what is installed, and the actions below. Pick a number to install,
+update, switch, pin, or remove that tool. Pick a letter for this computer,
+doctor, presets, mirrors, DNS, shell setup, or a DevForge update.
+
+```text
+DevForge 1.1.0
+  Ubuntu 24.04 (debian) | apt
+
+Tools  (enter a number)
+  Languages
+     1  php          8.3.6  (newer 8.5)
+     2  node         not installed
+Actions  (enter a letter)
+   g  Update DevForge
+   0  Exit
+Choice:
+```
+
+When a newer GitHub release exists, the menu says so on that first screen.
+`devforge self-update` downloads it, checks `SHA256SUMS`, and replaces only the
+program files. A git checkout is not overwritten; update that copy with
+`git pull`. Flags without a command, and `devforge` with no terminal, still
+print help and exit 2. `devforge tui` opens the same menu.
 
 ## Versions DevForge already knows
 

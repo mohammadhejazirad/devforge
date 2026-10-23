@@ -7,7 +7,7 @@ This document records decisions that are not obvious from the code.
 ```
 cli.py            parses arguments, builds a Printer and a Context, dispatches
 commands/         thin adapters: parse options, call core, return an exit code
-tui.py            numbered menu; not opened when no command is given
+tui.py            numbered menu; opened by a bare `devforge` on a terminal
 core/             detection, package managers, state, plan, net, mirrors, dns
 tools/            catalog, the shared engine, and one thin module per tool
 data/             catalog, version indexes, mirror profiles, DNS presets, presets
