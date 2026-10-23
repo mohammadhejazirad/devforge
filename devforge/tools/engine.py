@@ -869,9 +869,18 @@ def _add_env(plan: Plan, ctx: Context) -> None:
     )
 
 
+# Generic links. --install needs the link; --set only selects a registered path.
+_ALTERNATIVE_LINKS = {
+    "php": "/usr/bin/php",
+    "php-fpm": "/usr/sbin/php-fpm",
+    "java": "/usr/bin/java",
+}
+
+
 def _add_alternatives(plan: Plan, spec: ToolSpec, ctx: Context, version: str) -> None:
     if ctx.system().family != "debian":
         return
+    added = False
     for name, template in spec.alternatives:
         target = _expand(template, version, ctx.system().arch)
         plan.add(
@@ -882,7 +891,13 @@ def _add_alternatives(plan: Plan, spec: ToolSpec, ctx: Context, version: str) ->
                 sudo=True,
                 reason=f"Switching the system {name} default requires root.",
                 path=target,
+                dest=_ALTERNATIVE_LINKS.get(name, ""),
             )
+        )
+        added = True
+    if added:
+        plan.notes.append(
+            "A Debian alternative that is not registered yet is registered, then selected."
         )
 
 

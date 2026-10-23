@@ -7,6 +7,7 @@ returns. Applying a plan is the only path that writes or runs commands.
 from __future__ import annotations
 
 import os
+import re
 import shlex
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -222,13 +223,75 @@ def _apply_step(step: Step, ctx: ApplyContext) -> None:
         _service_step(step, ctx)
         return
     if step.kind == "alternatives":
-        if step.path and not Path(step.path).exists():
-            return
-        _run_command(step, ctx)
+        _alternatives_step(step, ctx)
         return
     if step.kind == "note":
         return
     raise ValueError(f"unknown plan step {step.kind}")
+
+
+_DOTTED_VERSION = re.compile(r"(\d+)\.(\d+)")
+_JAVA_MAJOR = re.compile(r"java-(\d+)")
+_ALTERNATIVE_LINK = re.compile(r"^/usr/s?bin/[a-z0-9][a-z0-9+._-]{0,40}$")
+
+
+def _alternatives_step(step: Step, ctx: ApplyContext) -> None:
+    """Select a Debian alternative, registering it when the group has no entry.
+
+    ``--set`` fails with "no alternatives for <name>" until ``--install`` has
+    created the group. Re-installing a path that is already registered would
+    replace its slaves, so a registered target is only selected.
+    """
+    if step.path and not Path(step.path).exists():
+        return
+    if len(step.argv) != 4 or step.argv[0] != "update-alternatives" or step.argv[1] != "--set":
+        _run_command(step, ctx)
+        return
+    name, target = step.argv[2], step.argv[3]
+    if _ALTERNATIVE_LINK.fullmatch(step.dest) and _alternative_needs_install(name, target, ctx):
+        _run_command(
+            Step(
+                title=f"Register the {name} alternative at {target}",
+                kind="command",
+                argv=(
+                    "update-alternatives",
+                    "--install",
+                    step.dest,
+                    name,
+                    target,
+                    _alternative_priority(target),
+                ),
+                sudo=step.sudo,
+                reason=step.reason,
+            ),
+            ctx,
+        )
+    _run_command(step, ctx)
+
+
+def _alternative_needs_install(name: str, target: str, ctx: ApplyContext) -> bool:
+    result = ctx.runner.run(("update-alternatives", "--query", name), timeout=30)
+    if result.code == 0:
+        prefix = "Alternative:"
+        for line in result.stdout.splitlines():
+            if line.startswith(prefix) and line[len(prefix) :].strip() == target:
+                return False
+        return True
+    detail = f"{result.stdout}\n{result.stderr}".lower()
+    return "no alternatives" in detail
+
+
+def _alternative_priority(target: str) -> str:
+    """Match Debian's PHP priority: major * 10 + minor, taken from the filename."""
+    name = target.rsplit("/", 1)[-1]
+    dotted = list(_DOTTED_VERSION.finditer(name))
+    if dotted:
+        found = dotted[-1]
+        return str(int(found.group(1)) * 10 + int(found.group(2)))
+    java = list(_JAVA_MAJOR.finditer(target))
+    if java:
+        return str(int(java[-1].group(1)) * 10)
+    return "10"
 
 
 def _run_command(step: Step, ctx: ApplyContext) -> None:

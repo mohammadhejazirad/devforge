@@ -24,6 +24,8 @@ from devforge.commands.network import cmd_dns_restore, cmd_dns_set, cmd_mirror_s
 from devforge.core.archive import ArchiveError, safe_extract
 from devforge.core.net import DownloadError, MemoryFetcher, download
 from devforge.core.pkgmgr import upgrade
+from devforge.core.plan import Plan, Step, apply_plan
+from devforge.core.runner import ScriptedRunner
 from devforge.core.shell import render_shim
 from devforge.tools.base import Scope
 from devforge.tools.engine import install_tool
@@ -91,6 +93,124 @@ def test_php_version_selects_debian_packages(tmp_path: Path) -> None:
     assert "php8.4-cli" in text
     assert "php8.4-fpm" in text
     assert "sudo --" in text
+    assert "update-alternatives --set php /usr/bin/php8.4" in text
+    assert "update-alternatives --set php-fpm /usr/sbin/php-fpm8.4" in text
+    assert "not registered yet is registered" in text
+    plan = install_tool(load_tool("php").spec, ctx, "8.4", make_default=True, use_package=False)
+    links = {step.argv[2]: step.dest for step in plan.steps if step.kind == "alternatives"}
+    assert links == {"php": "/usr/bin/php", "php-fpm": "/usr/sbin/php-fpm"}
+
+
+def test_missing_php_fpm_alternative_is_registered(tmp_path: Path) -> None:
+    ctx, _out, _err = machine(tmp_path, "debian-12", family="debian", dry_run=False)
+    target = tmp_path / "php-fpm8.5"
+    target.write_text("", encoding="utf-8")
+    runner = ctx.runner
+    assert isinstance(runner, ScriptedRunner)
+    runner.when_argv(
+        ["update-alternatives", "--query", "php-fpm"],
+        code=2,
+        stderr="update-alternatives: error: no alternatives for php-fpm\n",
+    )
+    code = apply_plan(_alternative_plan("php-fpm", "/usr/sbin/php-fpm", target), ctx.apply())
+    assert code == 0
+    assert runner.calls == [
+        ("update-alternatives", "--query", "php-fpm"),
+        (
+            "sudo",
+            "--",
+            "update-alternatives",
+            "--install",
+            "/usr/sbin/php-fpm",
+            "php-fpm",
+            str(target),
+            "85",
+        ),
+        ("sudo", "--", "update-alternatives", "--set", "php-fpm", str(target)),
+    ]
+
+
+def test_registered_alternative_is_only_selected(tmp_path: Path) -> None:
+    ctx, _out, _err = machine(tmp_path, "debian-12", family="debian", dry_run=False)
+    target = tmp_path / "php8.5"
+    target.write_text("", encoding="utf-8")
+    runner = ctx.runner
+    assert isinstance(runner, ScriptedRunner)
+    runner.when_argv(
+        ["update-alternatives", "--query", "php"],
+        stdout=f"Name: php\nAlternative: {target}\nPriority: 85\n",
+    )
+    assert apply_plan(_alternative_plan("php", "/usr/bin/php", target), ctx.apply()) == 0
+    assert runner.calls == [
+        ("update-alternatives", "--query", "php"),
+        ("sudo", "--", "update-alternatives", "--set", "php", str(target)),
+    ]
+
+
+def test_unreadable_alternative_query_does_not_reinstall(tmp_path: Path) -> None:
+    ctx, _out, _err = machine(tmp_path, "debian-12", family="debian", dry_run=False)
+    target = tmp_path / "php8.5"
+    target.write_text("", encoding="utf-8")
+    runner = ctx.runner
+    assert isinstance(runner, ScriptedRunner)
+    runner.when_argv(
+        ["update-alternatives", "--query", "php"],
+        code=1,
+        stderr="update-alternatives: error: cannot read the alternatives directory\n",
+    )
+    assert apply_plan(_alternative_plan("php", "/usr/bin/php", target), ctx.apply()) == 0
+    assert all("--install" not in call for call in runner.calls)
+    assert runner.calls[-1] == (
+        "sudo",
+        "--",
+        "update-alternatives",
+        "--set",
+        "php",
+        str(target),
+    )
+
+
+def test_missing_alternative_binary_is_skipped(tmp_path: Path) -> None:
+    ctx, _out, _err = machine(tmp_path, "debian-12", family="debian", dry_run=False)
+    target = tmp_path / "php-fpm8.5"
+    runner = ctx.runner
+    assert isinstance(runner, ScriptedRunner)
+    assert apply_plan(_alternative_plan("php-fpm", "/usr/sbin/php-fpm", target), ctx.apply()) == 0
+    assert runner.calls == []
+
+
+def test_java_alternative_priority_uses_the_major(tmp_path: Path) -> None:
+    ctx, _out, _err = machine(tmp_path, "debian-12", family="debian", dry_run=False)
+    target = tmp_path / "java-21-openjdk-amd64" / "bin" / "java"
+    target.parent.mkdir(parents=True)
+    target.write_text("", encoding="utf-8")
+    runner = ctx.runner
+    assert isinstance(runner, ScriptedRunner)
+    runner.when_argv(
+        ["update-alternatives", "--query", "java"],
+        code=2,
+        stderr="update-alternatives: error: no alternatives for java\n",
+    )
+    assert apply_plan(_alternative_plan("java", "/usr/bin/java", target), ctx.apply()) == 0
+    install = next(call for call in runner.calls if "--install" in call)
+    assert install[-1] == "210"
+
+
+def _alternative_plan(name: str, link: str, target: Path) -> Plan:
+    return Plan(
+        title=f"Select {name}",
+        steps=[
+            Step(
+                title=f"Point the {name} alternative at {target}",
+                kind="alternatives",
+                argv=("update-alternatives", "--set", name, str(target)),
+                sudo=True,
+                reason=f"Switching the system {name} default requires root.",
+                path=str(target),
+                dest=link,
+            )
+        ],
+    )
 
 
 def test_node_install_uses_the_lts_archive(tmp_path: Path) -> None:

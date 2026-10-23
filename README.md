@@ -76,7 +76,10 @@ Two kinds of install:
 
 DevForge does not replace `/usr/bin/python3`. A Python shim selects
 `python3.13` and leaves the system `python3` alone. PHP and Java alternatives
-are planned only on Debian, and only when the target binary exists.
+are planned only on Debian, and only when the target binary exists. A missing
+alternative, such as `php-fpm` when only `php-fpm8.5` is on disk, is registered
+and then selected. An alternative that is already registered is selected
+without being registered again.
 
 NVM and pyenv are detected and left alone. DevForge will not run their remote
 installers. npm is the npm that ships with Node: `devforge update npm` runs
