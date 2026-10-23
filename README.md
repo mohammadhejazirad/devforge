@@ -184,6 +184,12 @@ Actions  (enter a letter)
 Choice:
 ```
 
+Open PHP in that menu and choose **Install PHP extensions**. The list is grouped
+(databases, images, cache, and the rest) and every package uses the PHP line
+that is already installed: PHP 8.5.12 installs `php8.5-*`, not another line.
+Press Enter to install all of them. Enter inside a category installs that
+category. Packages the distro does not publish for that exact line are left out.
+
 When a newer GitHub release exists, the menu says so on that first screen.
 `devforge self-update` downloads it, checks `SHA256SUMS`, and replaces only the
 program files. A git checkout is not overwritten; update that copy with

@@ -1,0 +1,850 @@
+{
+  "prefix": {
+    "alpine": "php{major}{minor}-",
+    "arch": "php-",
+    "debian": "php{major}.{minor}-",
+    "rhel": "php-",
+    "suse": "php{major}-"
+  },
+  "categories": [
+    {
+      "id": "database",
+      "label": "Databases",
+      "extensions": [
+        {
+          "name": "mysql",
+          "summary": "MySQL and MariaDB",
+          "all": {
+            "alpine": ["mysqli", "mysqlnd", "pdo_mysql"],
+            "debian": ["mysql"],
+            "rhel": ["mysqlnd"],
+            "suse": ["mysql"]
+          }
+        },
+        {
+          "name": "pgsql",
+          "summary": "PostgreSQL",
+          "all": {
+            "alpine": ["pgsql", "pdo_pgsql"],
+            "debian": ["pgsql"],
+            "rhel": ["pgsql"],
+            "suse": ["pgsql"]
+          }
+        },
+        {
+          "name": "sqlite",
+          "summary": "SQLite",
+          "all": {
+            "alpine": ["sqlite3", "pdo_sqlite"],
+            "arch": ["sqlite"],
+            "debian": ["sqlite3"],
+            "suse": ["sqlite"]
+          }
+        },
+        {
+          "name": "odbc",
+          "summary": "ODBC",
+          "all": {
+            "alpine": ["odbc", "pdo_odbc"],
+            "debian": ["odbc"],
+            "rhel": ["odbc"]
+          }
+        },
+        {
+          "name": "sybase",
+          "summary": "Sybase and Microsoft SQL Server",
+          "all": {
+            "alpine": ["pdo_dblib"],
+            "debian": ["sybase"]
+          }
+        },
+        {
+          "name": "interbase",
+          "summary": "InterBase and Firebird",
+          "all": {
+            "debian": ["interbase"]
+          }
+        },
+        {
+          "name": "dba",
+          "summary": "Database abstraction",
+          "all": {
+            "alpine": ["dba"],
+            "debian": ["dba"],
+            "rhel": ["dba"]
+          }
+        },
+        {
+          "name": "mongodb",
+          "summary": "MongoDB",
+          "all": {
+            "alpine": ["pecl-mongodb"],
+            "debian": ["mongodb"],
+            "rhel": ["pecl-mongodb"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "text",
+      "label": "Strings, XML, and archives",
+      "extensions": [
+        {
+          "name": "mbstring",
+          "summary": "Multibyte strings",
+          "all": {
+            "alpine": ["mbstring"],
+            "debian": ["mbstring"],
+            "rhel": ["mbstring"],
+            "suse": ["mbstring"]
+          }
+        },
+        {
+          "name": "intl",
+          "summary": "Internationalization",
+          "all": {
+            "alpine": ["intl"],
+            "debian": ["intl"],
+            "rhel": ["intl"],
+            "suse": ["intl"]
+          }
+        },
+        {
+          "name": "xml",
+          "summary": "DOM, SimpleXML, and XMLReader",
+          "all": {
+            "alpine": ["xml", "dom", "simplexml", "xmlreader", "xmlwriter"],
+            "debian": ["xml"],
+            "rhel": ["xml"],
+            "suse": ["xmlreader", "xmlwriter"]
+          }
+        },
+        {
+          "name": "xsl",
+          "summary": "XSLT",
+          "all": {
+            "alpine": ["xsl"],
+            "debian": ["xsl"],
+            "suse": ["xsl"]
+          }
+        },
+        {
+          "name": "tidy",
+          "summary": "Tidy HTML",
+          "all": {
+            "alpine": ["tidy"],
+            "debian": ["tidy"],
+            "rhel": ["tidy"],
+            "suse": ["tidy"]
+          }
+        },
+        {
+          "name": "zip",
+          "summary": "Zip archives",
+          "all": {
+            "alpine": ["zip"],
+            "debian": ["zip"],
+            "suse": ["zip"]
+          },
+          "one": {
+            "rhel": ["pecl-zip"]
+          }
+        },
+        {
+          "name": "bz2",
+          "summary": "Bzip2",
+          "all": {
+            "alpine": ["bz2"],
+            "debian": ["bz2"],
+            "suse": ["bz2"]
+          }
+        },
+        {
+          "name": "enchant",
+          "summary": "Spell checking",
+          "all": {
+            "alpine": ["enchant"],
+            "debian": ["enchant"],
+            "rhel": ["enchant"]
+          }
+        },
+        {
+          "name": "pspell",
+          "summary": "Pspell",
+          "all": {
+            "alpine": ["pspell"],
+            "debian": ["pspell"],
+            "rhel": ["pspell"]
+          }
+        },
+        {
+          "name": "xmlrpc",
+          "summary": "XML-RPC",
+          "all": {
+            "debian": ["xmlrpc"]
+          }
+        },
+        {
+          "name": "gettext",
+          "summary": "Gettext",
+          "all": {
+            "alpine": ["gettext"],
+            "suse": ["gettext"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "images",
+      "label": "Images",
+      "extensions": [
+        {
+          "name": "gd",
+          "summary": "GD images",
+          "all": {
+            "alpine": ["gd"],
+            "arch": ["gd"],
+            "debian": ["gd"],
+            "rhel": ["gd"],
+            "suse": ["gd"]
+          }
+        },
+        {
+          "name": "imagick",
+          "summary": "ImageMagick",
+          "all": {
+            "alpine": ["pecl-imagick"],
+            "arch": ["imagick"],
+            "debian": ["imagick"],
+            "rhel": ["pecl-imagick"]
+          }
+        },
+        {
+          "name": "gmagick",
+          "summary": "GraphicsMagick",
+          "all": {
+            "debian": ["gmagick"]
+          }
+        },
+        {
+          "name": "vips",
+          "summary": "libvips",
+          "all": {
+            "debian": ["vips"]
+          }
+        },
+        {
+          "name": "ps",
+          "summary": "PostScript",
+          "all": {
+            "debian": ["ps"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "network",
+      "label": "Network",
+      "extensions": [
+        {
+          "name": "curl",
+          "summary": "cURL",
+          "all": {
+            "alpine": ["curl"],
+            "debian": ["curl"]
+          }
+        },
+        {
+          "name": "soap",
+          "summary": "SOAP",
+          "all": {
+            "alpine": ["soap"],
+            "debian": ["soap"],
+            "rhel": ["soap"],
+            "suse": ["soap"]
+          }
+        },
+        {
+          "name": "ldap",
+          "summary": "LDAP",
+          "all": {
+            "alpine": ["ldap"],
+            "debian": ["ldap"],
+            "rhel": ["ldap"],
+            "suse": ["ldap"]
+          }
+        },
+        {
+          "name": "snmp",
+          "summary": "SNMP",
+          "all": {
+            "alpine": ["snmp"],
+            "arch": ["snmp"],
+            "debian": ["snmp"],
+            "rhel": ["snmp"]
+          }
+        },
+        {
+          "name": "imap",
+          "summary": "IMAP",
+          "all": {
+            "alpine": ["imap"],
+            "debian": ["imap"]
+          }
+        },
+        {
+          "name": "ssh2",
+          "summary": "SSH2",
+          "all": {
+            "alpine": ["pecl-ssh2"],
+            "debian": ["ssh2"]
+          }
+        },
+        {
+          "name": "http",
+          "summary": "PECL HTTP",
+          "all": {
+            "debian": ["http"],
+            "rhel": ["pecl-http"]
+          }
+        },
+        {
+          "name": "oauth",
+          "summary": "OAuth",
+          "all": {
+            "debian": ["oauth"]
+          }
+        },
+        {
+          "name": "solr",
+          "summary": "Apache Solr",
+          "all": {
+            "debian": ["solr"]
+          }
+        },
+        {
+          "name": "stomp",
+          "summary": "STOMP",
+          "all": {
+            "debian": ["stomp"]
+          }
+        },
+        {
+          "name": "rrd",
+          "summary": "RRDtool",
+          "all": {
+            "debian": ["rrd"]
+          }
+        },
+        {
+          "name": "smbclient",
+          "summary": "SMB client",
+          "all": {
+            "debian": ["smbclient"]
+          }
+        },
+        {
+          "name": "maxminddb",
+          "summary": "MaxMind DB",
+          "all": {
+            "alpine": ["pecl-maxminddb"],
+            "debian": ["maxminddb"]
+          }
+        },
+        {
+          "name": "sockets",
+          "summary": "Sockets",
+          "all": {
+            "alpine": ["sockets"],
+            "suse": ["sockets"]
+          }
+        },
+        {
+          "name": "ftp",
+          "summary": "FTP",
+          "all": {
+            "alpine": ["ftp"],
+            "suse": ["ftp"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cache",
+      "label": "Cache",
+      "extensions": [
+        {
+          "name": "redis",
+          "summary": "Redis",
+          "all": {
+            "alpine": ["pecl-redis"],
+            "arch": ["redis"],
+            "debian": ["redis"],
+            "suse": ["redis"]
+          },
+          "one": {
+            "rhel": ["pecl-redis6", "pecl-redis5", "pecl-redis"]
+          }
+        },
+        {
+          "name": "memcached",
+          "summary": "Memcached",
+          "all": {
+            "alpine": ["pecl-memcached"],
+            "arch": ["memcached"],
+            "debian": ["memcached"],
+            "rhel": ["pecl-memcached"]
+          }
+        },
+        {
+          "name": "memcache",
+          "summary": "Memcache",
+          "all": {
+            "debian": ["memcache"]
+          }
+        },
+        {
+          "name": "apcu",
+          "summary": "APCu user cache",
+          "all": {
+            "alpine": ["pecl-apcu"],
+            "arch": ["apcu"],
+            "debian": ["apcu"],
+            "rhel": ["pecl-apcu"]
+          }
+        },
+        {
+          "name": "igbinary",
+          "summary": "Igbinary serializer",
+          "all": {
+            "alpine": ["pecl-igbinary"],
+            "arch": ["igbinary"],
+            "debian": ["igbinary"],
+            "rhel": ["pecl-igbinary"]
+          }
+        },
+        {
+          "name": "msgpack",
+          "summary": "MessagePack",
+          "all": {
+            "alpine": ["pecl-msgpack"],
+            "debian": ["msgpack"],
+            "rhel": ["pecl-msgpack"]
+          }
+        },
+        {
+          "name": "yac",
+          "summary": "YAC cache",
+          "all": {
+            "debian": ["yac"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "queues",
+      "label": "Queues and workers",
+      "extensions": [
+        {
+          "name": "amqp",
+          "summary": "AMQP",
+          "all": {
+            "alpine": ["pecl-amqp"],
+            "debian": ["amqp"]
+          }
+        },
+        {
+          "name": "rdkafka",
+          "summary": "Kafka",
+          "all": {
+            "debian": ["rdkafka"]
+          }
+        },
+        {
+          "name": "gearman",
+          "summary": "Gearman",
+          "all": {
+            "debian": ["gearman"]
+          }
+        },
+        {
+          "name": "swoole",
+          "summary": "Swoole",
+          "all": {
+            "alpine": ["pecl-swoole"],
+            "debian": ["swoole"]
+          }
+        },
+        {
+          "name": "openswoole",
+          "summary": "OpenSwoole",
+          "all": {
+            "debian": ["openswoole"]
+          }
+        },
+        {
+          "name": "zmq",
+          "summary": "ZeroMQ",
+          "all": {
+            "debian": ["zmq"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "label": "Security",
+      "extensions": [
+        {
+          "name": "gnupg",
+          "summary": "GnuPG",
+          "all": {
+            "debian": ["gnupg"]
+          }
+        },
+        {
+          "name": "mcrypt",
+          "summary": "mcrypt",
+          "all": {
+            "debian": ["mcrypt"]
+          }
+        },
+        {
+          "name": "sodium",
+          "summary": "libsodium",
+          "all": {
+            "alpine": ["sodium"],
+            "rhel": ["sodium"],
+            "suse": ["sodium"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "debug",
+      "label": "Debugging",
+      "extensions": [
+        {
+          "name": "xdebug",
+          "summary": "Xdebug",
+          "all": {
+            "alpine": ["pecl-xdebug"],
+            "debian": ["xdebug"],
+            "rhel": ["pecl-xdebug"]
+          }
+        },
+        {
+          "name": "pcov",
+          "summary": "PCOV coverage",
+          "all": {
+            "debian": ["pcov"]
+          }
+        },
+        {
+          "name": "xhprof",
+          "summary": "XHProf",
+          "all": {
+            "alpine": ["pecl-xhprof"],
+            "debian": ["xhprof"]
+          }
+        },
+        {
+          "name": "excimer",
+          "summary": "Excimer profiler",
+          "all": {
+            "debian": ["excimer"]
+          }
+        },
+        {
+          "name": "opentelemetry",
+          "summary": "OpenTelemetry",
+          "all": {
+            "debian": ["opentelemetry"]
+          }
+        },
+        {
+          "name": "pinba",
+          "summary": "Pinba",
+          "all": {
+            "debian": ["pinba"]
+          }
+        },
+        {
+          "name": "ast",
+          "summary": "AST",
+          "all": {
+            "alpine": ["pecl-ast"],
+            "debian": ["ast"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "other",
+      "label": "Other modules",
+      "extensions": [
+        {
+          "name": "bcmath",
+          "summary": "Arbitrary precision math",
+          "all": {
+            "alpine": ["bcmath"],
+            "debian": ["bcmath"],
+            "rhel": ["bcmath"],
+            "suse": ["bcmath"]
+          }
+        },
+        {
+          "name": "gmp",
+          "summary": "GNU multiple precision",
+          "all": {
+            "alpine": ["gmp"],
+            "debian": ["gmp"],
+            "rhel": ["gmp"],
+            "suse": ["gmp"]
+          }
+        },
+        {
+          "name": "opcache",
+          "summary": "OPcache",
+          "all": {
+            "alpine": ["opcache"],
+            "debian": ["opcache"],
+            "rhel": ["opcache"],
+            "suse": ["opcache"]
+          }
+        },
+        {
+          "name": "readline",
+          "summary": "Readline",
+          "all": {
+            "debian": ["readline"],
+            "suse": ["readline"]
+          }
+        },
+        {
+          "name": "decimal",
+          "summary": "Decimal",
+          "all": {
+            "debian": ["decimal"]
+          }
+        },
+        {
+          "name": "ds",
+          "summary": "Data structures",
+          "all": {
+            "debian": ["ds"]
+          }
+        },
+        {
+          "name": "uuid",
+          "summary": "UUID",
+          "all": {
+            "alpine": ["pecl-uuid"],
+            "debian": ["uuid"]
+          }
+        },
+        {
+          "name": "yaml",
+          "summary": "YAML",
+          "all": {
+            "alpine": ["pecl-yaml"],
+            "debian": ["yaml"],
+            "rhel": ["pecl-yaml"]
+          }
+        },
+        {
+          "name": "mailparse",
+          "summary": "Mailparse",
+          "all": {
+            "alpine": ["pecl-mailparse"],
+            "debian": ["mailparse"],
+            "rhel": ["pecl-mailparse"]
+          }
+        },
+        {
+          "name": "uploadprogress",
+          "summary": "Upload progress",
+          "all": {
+            "debian": ["uploadprogress"]
+          }
+        },
+        {
+          "name": "psr",
+          "summary": "PSR",
+          "all": {
+            "alpine": ["pecl-psr"],
+            "debian": ["psr"]
+          }
+        },
+        {
+          "name": "raphf",
+          "summary": "Resource and persistent handles",
+          "all": {
+            "debian": ["raphf"],
+            "rhel": ["pecl-raphf"]
+          }
+        },
+        {
+          "name": "inotify",
+          "summary": "inotify",
+          "all": {
+            "debian": ["inotify"]
+          }
+        },
+        {
+          "name": "dio",
+          "summary": "Direct I/O",
+          "all": {
+            "debian": ["dio"]
+          }
+        },
+        {
+          "name": "lz4",
+          "summary": "LZ4",
+          "all": {
+            "debian": ["lz4"]
+          }
+        },
+        {
+          "name": "zstd",
+          "summary": "Zstandard",
+          "all": {
+            "alpine": ["pecl-zstd"],
+            "debian": ["zstd"]
+          }
+        },
+        {
+          "name": "protobuf",
+          "summary": "Protocol Buffers",
+          "all": {
+            "alpine": ["pecl-protobuf"],
+            "debian": ["protobuf"]
+          }
+        },
+        {
+          "name": "grpc",
+          "summary": "gRPC",
+          "all": {
+            "debian": ["grpc"]
+          }
+        },
+        {
+          "name": "phalcon",
+          "summary": "Phalcon",
+          "all": {
+            "debian": ["phalcon5"]
+          }
+        },
+        {
+          "name": "pq",
+          "summary": "PostgreSQL pq",
+          "all": {
+            "debian": ["pq"]
+          }
+        },
+        {
+          "name": "uopz",
+          "summary": "uopz",
+          "all": {
+            "debian": ["uopz"]
+          }
+        },
+        {
+          "name": "xlswriter",
+          "summary": "XLSX writer",
+          "all": {
+            "debian": ["xlswriter"]
+          }
+        },
+        {
+          "name": "libvirt",
+          "summary": "libvirt",
+          "all": {
+            "debian": ["libvirt-php"]
+          }
+        },
+        {
+          "name": "exif",
+          "summary": "EXIF",
+          "all": {
+            "alpine": ["exif"],
+            "suse": ["exif"]
+          }
+        },
+        {
+          "name": "ffi",
+          "summary": "FFI",
+          "all": {
+            "alpine": ["ffi"],
+            "suse": ["ffi"]
+          }
+        },
+        {
+          "name": "pcntl",
+          "summary": "Process control",
+          "all": {
+            "alpine": ["pcntl"],
+            "rhel": ["process"],
+            "suse": ["pcntl"]
+          }
+        },
+        {
+          "name": "calendar",
+          "summary": "Calendar",
+          "all": {
+            "alpine": ["calendar"],
+            "suse": ["calendar"]
+          }
+        },
+        {
+          "name": "posix",
+          "summary": "POSIX",
+          "all": {
+            "alpine": ["posix"],
+            "suse": ["posix"]
+          }
+        },
+        {
+          "name": "shmop",
+          "summary": "Shared memory",
+          "all": {
+            "alpine": ["shmop"],
+            "suse": ["shmop"]
+          }
+        },
+        {
+          "name": "sysv",
+          "summary": "System V IPC",
+          "all": {
+            "alpine": ["sysvmsg", "sysvsem", "sysvshm"],
+            "suse": ["sysvmsg", "sysvsem", "sysvshm"]
+          }
+        },
+        {
+          "name": "fileinfo",
+          "summary": "Fileinfo",
+          "all": {
+            "alpine": ["fileinfo"],
+            "suse": ["fileinfo"]
+          }
+        },
+        {
+          "name": "iconv",
+          "summary": "iconv",
+          "all": {
+            "alpine": ["iconv"],
+            "suse": ["iconv"]
+          }
+        },
+        {
+          "name": "tokenizer",
+          "summary": "Tokenizer",
+          "all": {
+            "alpine": ["tokenizer"],
+            "suse": ["tokenizer"]
+          }
+        }
+      ]
+    }
+  ]
+}

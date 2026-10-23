@@ -13,6 +13,7 @@ from typing import IO
 
 from devforge import __version__
 from devforge import strings as s
+from devforge.commands.common import run_plan
 from devforge.commands.files import _load_presets, cmd_preset_apply, cmd_shell
 from devforge.commands.inspect import cmd_doctor, cmd_info, cmd_status, cmd_versions
 from devforge.commands.lifecycle import cmd_install, cmd_uninstall, cmd_update, cmd_use
@@ -27,6 +28,13 @@ from devforge.tools.base import Scope, ToolStatus
 from devforge.tools.catalog import load_index
 from devforge.tools.engine import _known_newest
 from devforge.tools.managed import ManagedTool, all_tools
+from devforge.tools.php_extensions import (
+    PhpExtensionCatalog,
+    PhpExtensionCategory,
+    PhpExtensionError,
+    extension_plan,
+    load_php_extensions,
+)
 
 _CATEGORIES = (
     ("runtime", "Languages"),
@@ -170,6 +178,8 @@ def _tool_options(status: ToolStatus) -> list[tuple[str, str]]:
     if status.can_install:
         options.append(("Install the preferred version", "install"))
         options.append(("Install a specific version", "install-version"))
+    if status.name == "php":
+        options.append(("Install PHP extensions", "php-extensions"))
     if status.can_update:
         options.append(("Update", "update"))
     if status.can_switch:
@@ -192,6 +202,8 @@ def _run_tool_action(ctx: Context, lines: Iterator[str], tool: ManagedTool, kind
             cmd_install(ctx, tool.name, version, make_default=True, use_package=False)
             return True
         return False
+    if kind == "php-extensions":
+        return _php_extensions(ctx, lines, tool)
     if kind == "update":
         cmd_update(ctx, tool.name, all_tools_flag=False)
         return True
@@ -221,6 +233,82 @@ def _run_tool_action(ctx: Context, lines: Iterator[str], tool: ManagedTool, kind
         cmd_versions(ctx, tool.name, refresh=False)
         return False
     return False
+
+
+def _php_extensions(ctx: Context, lines: Iterator[str], tool: ManagedTool) -> bool:
+    """Install extensions for the PHP version that is already installed."""
+    status = tool.status(ctx)
+    version = status.installed_version
+    if not version:
+        ctx.printer.error(
+            "Install PHP first. Extensions are built for the PHP version already on this machine."
+        )
+        return False
+    try:
+        catalog = load_php_extensions(ctx, version)
+    except PhpExtensionError as exc:
+        ctx.printer.error(str(exc))
+        return False
+    while True:
+        ctx.printer.raw("")
+        ctx.printer.info(f"PHP {version} extensions")
+        ctx.printer.raw(f"  Every package matches PHP {catalog.line}, the installed line.")
+        ctx.printer.raw("  1  Install all extensions (default)")
+        for index, category in enumerate(catalog.categories, start=2):
+            count = len(category.extensions)
+            ctx.printer.raw(f"  {index}  {category.label} ({count})")
+        ctx.printer.raw("  0  back")
+        choice = _ask_default(ctx, lines, "Choice", "1")
+        if choice is None or choice == "0":
+            return False
+        if choice == "1":
+            return _apply_php_extensions(ctx, catalog, None)
+        if choice.isdigit():
+            index = int(choice) - 2
+            if 0 <= index < len(catalog.categories):
+                if _php_category(ctx, lines, catalog, catalog.categories[index]):
+                    return True
+                continue
+        ctx.printer.error("Enter a number from the list, or press Enter to install all.")
+
+
+def _php_category(
+    ctx: Context,
+    lines: Iterator[str],
+    catalog: PhpExtensionCatalog,
+    category: PhpExtensionCategory,
+) -> bool:
+    while True:
+        ctx.printer.raw("")
+        ctx.printer.info(f"{category.label} for PHP {catalog.line}")
+        ctx.printer.raw("  1  Install every extension in this category (default)")
+        for index, extension in enumerate(category.extensions, start=2):
+            packages = ", ".join(extension.packages)
+            mark = "  installed" if extension.installed else ""
+            ctx.printer.raw(f"  {index:>2}  {extension.name:<16} {packages}{mark}")
+            ctx.printer.raw(f"      {extension.summary}")
+        ctx.printer.raw("  0  back")
+        choice = _ask_default(ctx, lines, "Choice", "1")
+        if choice is None or choice == "0":
+            return False
+        if choice == "1":
+            names = tuple(item.name for item in category.extensions)
+            return _apply_php_extensions(ctx, catalog, names)
+        if choice.isdigit():
+            index = int(choice) - 2
+            if 0 <= index < len(category.extensions):
+                return _apply_php_extensions(ctx, catalog, (category.extensions[index].name,))
+        ctx.printer.error("Enter a number from the list, or press Enter to install this category.")
+
+
+def _apply_php_extensions(
+    ctx: Context,
+    catalog: PhpExtensionCatalog,
+    names: tuple[str, ...] | None,
+) -> bool:
+    plan = extension_plan(ctx, catalog.version, names, catalog=catalog)
+    run_plan(ctx, plan)
+    return True
 
 
 def _pick_version(ctx: Context, lines: Iterator[str], tool: ManagedTool) -> str | None:
@@ -413,12 +501,20 @@ _ACTIONS = {
 
 
 def _ask(ctx: Context, lines: Iterator[str], prompt: str) -> str | None:
-    ctx.printer.stream.write(prompt + ": ")
+    return _ask_default(ctx, lines, prompt, "")
+
+
+def _ask_default(ctx: Context, lines: Iterator[str], prompt: str, default: str) -> str | None:
+    suffix = f" [{default}]" if default else ""
+    ctx.printer.stream.write(prompt + suffix + ": ")
     ctx.printer.stream.flush()
     try:
-        return next(lines).strip()
+        answer = next(lines).strip()
     except StopIteration:
         return None
+    if not answer and default:
+        return default
+    return answer
 
 
 def _pause(ctx: Context, lines: Iterator[str]) -> None:
