@@ -17,7 +17,7 @@ from devforge import __version__
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "install.sh"
-RELEASE = "1.1.0"
+RELEASE = "1.2.0"
 
 
 def _pinned_sha() -> str:
@@ -42,8 +42,8 @@ def test_pinned_checksum_matches_the_release_archive(tmp_path: Path) -> None:
 
 
 def test_installer_installs_into_a_prefix(tmp_path: Path) -> None:
-    archive = tmp_path / "devforge-1.1.0.tar.gz"
-    digest = build_archive(ROOT, archive, "1.1.0")
+    archive = tmp_path / f"devforge-{RELEASE}.tar.gz"
+    digest = build_archive(ROOT, archive, RELEASE)
     port = _serve(tmp_path)
     prefix = tmp_path / "opt"
     result = _run_installer(prefix, port, digest)
@@ -62,8 +62,8 @@ def test_installer_installs_into_a_prefix(tmp_path: Path) -> None:
 
 
 def test_installer_rejects_a_bad_checksum(tmp_path: Path) -> None:
-    archive = tmp_path / "devforge-1.1.0.tar.gz"
-    build_archive(ROOT, archive, "1.1.0")
+    archive = tmp_path / f"devforge-{RELEASE}.tar.gz"
+    build_archive(ROOT, archive, RELEASE)
     port = _serve(tmp_path)
     prefix = tmp_path / "opt"
     result = _run_installer(prefix, port, "a" * 64)
@@ -73,7 +73,7 @@ def test_installer_rejects_a_bad_checksum(tmp_path: Path) -> None:
 
 
 def test_installer_rejects_an_escaping_archive(tmp_path: Path) -> None:
-    archive = tmp_path / "devforge-1.1.0.tar.gz"
+    archive = tmp_path / f"devforge-{RELEASE}.tar.gz"
     with tarfile.open(archive, "w:gz") as packed:
         info = tarfile.TarInfo("../escape")
         payload = b"nope\n"
@@ -109,7 +109,7 @@ def _serve(directory: Path) -> int:
 def _run_installer(prefix: Path, port: int, digest: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
     env["DEVFORGE_PREFIX"] = str(prefix)
-    env["DEVFORGE_RELEASE_URL"] = f"http://127.0.0.1:{port}/devforge-1.1.0.tar.gz"
+    env["DEVFORGE_RELEASE_URL"] = f"http://127.0.0.1:{port}/devforge-{RELEASE}.tar.gz"
     env["DEVFORGE_RELEASE_SHA256"] = digest
     env["HOME"] = str(prefix / "home")
     return subprocess.run(
@@ -122,8 +122,8 @@ def _run_installer(prefix: Path, port: int, digest: str) -> subprocess.Completed
 
 
 def test_reinstall_keeps_managed_tools(tmp_path: Path) -> None:
-    archive = tmp_path / "devforge-1.1.0.tar.gz"
-    digest = build_archive(ROOT, archive, "1.1.0")
+    archive = tmp_path / f"devforge-{RELEASE}.tar.gz"
+    digest = build_archive(ROOT, archive, RELEASE)
     port = _serve(tmp_path)
     prefix = tmp_path / "opt"
     first = _run_installer(prefix, port, digest)
@@ -147,14 +147,14 @@ def test_old_python_does_not_install_packages(tmp_path: Path) -> None:
     fake = bindir / "python3"
     fake.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
     fake.chmod(0o755)
-    archive = tmp_path / "devforge-1.1.0.tar.gz"
-    digest = build_archive(ROOT, archive, "1.1.0")
+    archive = tmp_path / f"devforge-{RELEASE}.tar.gz"
+    digest = build_archive(ROOT, archive, RELEASE)
     port = _serve(tmp_path)
     prefix = tmp_path / "opt"
     env = os.environ.copy()
     env["PATH"] = f"{bindir}:{env.get('PATH', '')}"
     env["DEVFORGE_PREFIX"] = str(prefix)
-    env["DEVFORGE_RELEASE_URL"] = f"http://127.0.0.1:{port}/devforge-1.1.0.tar.gz"
+    env["DEVFORGE_RELEASE_URL"] = f"http://127.0.0.1:{port}/devforge-{RELEASE}.tar.gz"
     env["DEVFORGE_RELEASE_SHA256"] = digest
     env["HOME"] = str(tmp_path / "home")
     result = subprocess.run(

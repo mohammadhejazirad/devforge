@@ -6,9 +6,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
 set -eu
 
-VERSION="1.1.0"
-DEFAULT_URL="https://github.com/mohammadhejazirad/devforge/releases/download/v1.1.0/devforge-1.1.0.tar.gz"
-DEFAULT_SHA256="544355dd879e2e0db29b5d74f80a8a4a0236c7152dc74d8a1dd4336a3a45a640"
+VERSION="1.2.0"
+DEFAULT_URL="https://github.com/mohammadhejazirad/devforge/releases/download/v1.2.0/devforge-1.2.0.tar.gz"
+DEFAULT_SHA256="25805006fb08e87a4f9e771aa93c73a18141429cc625bcfa8d9a724dedd0393c"
 
 URL="${DEVFORGE_RELEASE_URL:-$DEFAULT_URL}"
 SHA256="${DEVFORGE_RELEASE_SHA256:-$DEFAULT_SHA256}"

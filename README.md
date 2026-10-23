@@ -4,7 +4,7 @@ DevForge installs, updates, switches, pins, and removes development tools on
 Linux. It detects the machine, shows a plan, and changes the system only after
 you confirm. The same commands work on a desktop and on a server.
 
-This tree is **version 1.1.0**. It manages languages, package tools,
+This tree is **version 1.2.0**. It manages languages, package tools,
 infrastructure, databases, and everyday utilities. A Persian walkthrough is in
 [docs/guide.fa.md](docs/guide.fa.md).
 
@@ -18,7 +18,7 @@ infrastructure, databases, and everyday utilities. A Persian walkthrough is in
 
 ## Install
 
-### From a checkout (version 1.1.0)
+### From a checkout (version 1.2.0)
 
 ```bash
 git clone https://github.com/mohammadhejazirad/devforge.git
@@ -33,15 +33,15 @@ python3 -m pip install --user -e .
 devforge --version
 ```
 
-That prints `devforge 1.1.0` from this tree.
+That prints `devforge 1.2.0` from this tree.
 
-### Published installer (release 1.1.0)
+### Published installer (release 1.2.0)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
 ```
 
-`install.sh` downloads `devforge-1.1.0.tar.gz` from the GitHub release, checks
+`install.sh` downloads `devforge-1.2.0.tar.gz` from the GitHub release, checks
 the SHA256 pinned in the script, and installs into `~/.local` (or `/usr/local`
 when run as root). It does not run any other remote script. Running it again
 replaces the program and leaves `tools/`, `shims/`, and `env.sh` in place.
@@ -174,7 +174,7 @@ update, switch, pin, or remove that tool. Pick a letter for this computer,
 doctor, presets, mirrors, DNS, shell setup, or a DevForge update.
 
 ```text
-DevForge 1.1.0
+DevForge 1.2.0
   Ubuntu 24.04 (debian) | apt
 
 Tools  (enter a number)
