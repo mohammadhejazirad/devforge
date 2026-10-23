@@ -5,15 +5,34 @@ This document records decisions that are not obvious from the code.
 ## Layering
 
 ```
-cli.py            parses arguments, builds a Printer, dispatches to a command
+cli.py            parses arguments, builds a Printer and a Context, dispatches
 commands/         thin adapters: parse options, call core, return an exit code
-core/             pure-ish logic: detection, package managers, state, plan, net
-tools/            one module per managed tool, implementing the Tool interface
+tui.py            numbered menu; not opened when no command is given
+core/             detection, package managers, state, plan, net, mirrors, dns
+tools/            catalog, the shared engine, and one thin module per tool
+data/             catalog, version indexes, mirror profiles, DNS presets, presets
 ```
 
 Nothing in `core/` or `tools/` writes to the terminal directly. They return
 plans and data; `commands/` and the TUI render them. This keeps every mutating
 path testable in `--dry-run` without root.
+
+## Tool strategies
+
+`data/catalog.json` is the list of tools. `tools/engine.py` turns a catalog
+record into a plan. Strategies:
+
+- `archive`: official tarball or file, checksum, side-by-side directory, shim.
+- `package`: distro package. An explicit version uses `versioned_packages`
+  when that family has them.
+- `external`: detect nvm or pyenv and refuse to install or remove them.
+- `npm`: delegate to the Node install; update is `npm install -g npm@latest`.
+- `rustup`: checksummed `rustup-init` under the data directory, or the
+  rustup already on `PATH` when it is not one of our shims.
+
+A file format such as kubectl is copied after the checksum check. It is not
+passed to tar. Alpine gets a musl build when the catalog has one, and a note
+when the only build is glibc.
 
 ## Side effects are injectable
 

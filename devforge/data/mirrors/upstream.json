@@ -1,0 +1,6 @@
+{
+  "name": "upstream",
+  "verified": true,
+  "description": "Official upstreams. Selecting this profile clears mirror rewrites.",
+  "rewrites": []
+}

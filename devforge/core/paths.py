@@ -70,6 +70,16 @@ class Paths:
         """Where DevForge keeps the toolchains it manages."""
         return self.data / "tools"
 
+    @property
+    def shims(self) -> Path:
+        """Directory prepended to PATH. One executable shim per tool."""
+        return self.data / "shims"
+
+    @property
+    def env_file(self) -> Path:
+        """Shell fragment sourced by shims (mirrors, GOPROXY, and similar)."""
+        return self.data / "env.sh"
+
     def owned_roots(self) -> tuple[Path, ...]:
         return (self.data, self.state, self.config, self.cache)
 

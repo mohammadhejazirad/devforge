@@ -1,0 +1,5 @@
+{
+  "name": "devops",
+  "summary": "Docker, kubectl, Helm, Terraform, Git, and jq",
+  "tools": ["docker", "kubectl", "helm", "terraform", "git", "jq"]
+}

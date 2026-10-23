@@ -1,17 +1,21 @@
 # Mirror profiles
 
 Community-maintained mirror definitions live here as JSON files, one file per
-profile group (for example `iran.json`, `global.json`).
+profile. `upstream.json` is the empty default. `iran.json` is an unverified
+opt-in profile.
 
 Rules:
 
-- Data, not code. Vendors and URLs must not be hardcoded in Python logic.
+- Data, not code. Applying a profile only rewrites URLs that the file lists.
 - Mirrors are opt-in. The default is always the upstream source.
-- Every entry must record which ecosystem it covers (OS packages, npm, PyPI,
-  Composer, Go, Docker registry, GitHub releases, Maven, RubyGems, crates).
-- Entries should say whether they are verified. Unverified entries are shown
-  with a warning until a maintainer reviews them.
-- Checksum and GPG verification stays on even when a mirror is in use.
+- Every rewrite records its ecosystem. A prefix rewrite needs both an upstream
+  and a mirror, and both must be `https` URLs.
+- Unverified profiles are shown with a warning.
+- Checksum verification stays on even when a mirror is in use.
+- Do not add an apt, dnf, npm, or PyPI URL until someone has checked that it
+  serves the same bytes as the upstream.
 
-No profiles are shipped yet; they are added in the mirrors phase.
+`iran.json` only lists Docker registry prefixes. It does not change distro
+package repositories. `devforge mirror set iran` can also merge those mirror
+URLs into `/etc/docker/daemon.json` after a backup.
 

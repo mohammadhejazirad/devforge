@@ -1,0 +1,18 @@
+{
+  "tool": "bun",
+  "latest": "1.4.4",
+  "versions": [
+    "1.4.4"
+  ],
+  "refresh": {
+    "format": "github",
+    "url": "https://api.github.com/repos/oven-sh/bun/releases/latest"
+  },
+  "sha256": {
+    "1.4.4": {
+      "amd64": "bf8ccbfb2b0b80159e0f9a6d15c55317add8077534dbc6130a3edb52fccb395c",
+      "arm64": "baa6bb36f51d6e58561e02bbea825038a9df454f673d6d776e8bbf86f8c7850e",
+      "amd64-musl": "a5a8ccc5e74dcb883fe974f125a7bdb3b41e5195ed1b870e73f17effd3eb2b2d"
+    }
+  }
+}

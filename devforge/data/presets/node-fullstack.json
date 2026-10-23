@@ -1,0 +1,5 @@
+{
+  "name": "node-fullstack",
+  "summary": "Node.js, pnpm, and Git",
+  "tools": ["node", "pnpm", "git", "curl"]
+}

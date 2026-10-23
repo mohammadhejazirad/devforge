@@ -1,0 +1,17 @@
+{
+  "tool": "composer",
+  "latest": "2.10.3",
+  "lts": "2.10.3",
+  "versions": [
+    "2.10.3"
+  ],
+  "refresh": {
+    "format": "composer",
+    "url": "https://getcomposer.org/versions"
+  },
+  "sha256": {
+    "2.10.3": {
+      "any": "7a2d379d5b8ffdaa028580ef26494c36d2feef4b178d3dd1473a4dbc5e17c8d6"
+    }
+  }
+}

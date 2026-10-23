@@ -1,0 +1,18 @@
+{
+  "tool": "pnpm",
+  "latest": "12.15.0",
+  "versions": [
+    "12.15.0"
+  ],
+  "refresh": {
+    "format": "github",
+    "url": "https://api.github.com/repos/pnpm/pnpm/releases/latest"
+  },
+  "sha256": {
+    "12.15.0": {
+      "amd64": "55b5ed0092bd11176c1669598e231ae52e7cedac59de6efd0d415730f37d0598",
+      "arm64": "d7ce93a2c7d847d3a34bd3f559b60c14f578b1320c17cc352a2c5c5fdf956117",
+      "amd64-musl": "d33802cc987dcfbe02a991473764ba25ad1b2344189e2097a2570baed66f008a"
+    }
+  }
+}

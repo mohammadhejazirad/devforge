@@ -1,0 +1,1189 @@
+{
+  "tools": [
+    {
+      "name": "php",
+      "summary": "PHP CLI and FPM from the distro, with a side-by-side default",
+      "category": "runtime",
+      "strategy": "package",
+      "binaries": [
+        "php"
+      ],
+      "version_args": [
+        "-v"
+      ],
+      "version_regex": "PHP (\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "php"
+      ],
+      "project_files": [
+        ".php-version"
+      ],
+      "packages": {
+        "debian": [
+          "php-cli",
+          "php-fpm"
+        ],
+        "rhel": [
+          "php-cli",
+          "php-fpm"
+        ],
+        "arch": [
+          "php",
+          "php-fpm"
+        ],
+        "suse": [
+          "php8",
+          "php8-fpm"
+        ],
+        "alpine": [
+          "php",
+          "php-fpm"
+        ]
+      },
+      "versioned_packages": {
+        "debian": [
+          "php{major}.{minor}-cli",
+          "php{major}.{minor}-fpm"
+        ],
+        "alpine": [
+          "php{major}{minor}",
+          "php{major}{minor}-fpm"
+        ]
+      },
+      "system_bins": [
+        "php{mm}",
+        "php{compact}"
+      ],
+      "alternatives": [
+        [
+          "php",
+          "/usr/bin/php{major}.{minor}"
+        ],
+        [
+          "php-fpm",
+          "/usr/sbin/php-fpm{major}.{minor}"
+        ]
+      ]
+    },
+    {
+      "name": "node",
+      "summary": "Node.js from nodejs.org, installed side by side",
+      "category": "runtime",
+      "strategy": "archive",
+      "binaries": [
+        "node"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "v?(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "node",
+        "npm",
+        "npx",
+        "corepack"
+      ],
+      "project_files": [
+        ".nvmrc",
+        ".node-version"
+      ],
+      "coexist_dirs": [
+        ".nvm"
+      ],
+      "coexist_env": [
+        "NVM_DIR"
+      ],
+      "fallback_packages": {
+        "debian": [
+          "nodejs"
+        ],
+        "rhel": [
+          "nodejs"
+        ],
+        "arch": [
+          "nodejs"
+        ],
+        "suse": [
+          "nodejs"
+        ],
+        "alpine": [
+          "nodejs"
+        ]
+      },
+      "archive": {
+        "format": "tar.xz",
+        "url": "https://nodejs.org/dist/v{version}/node-v{version}-linux-{arch}.tar.xz",
+        "checksum_url": "https://nodejs.org/dist/v{version}/SHASUMS256.txt",
+        "checksum_format": "sums",
+        "arch_map": {
+          "amd64": "x64",
+          "arm64": "arm64",
+          "arm": "armv7l"
+        },
+        "libc_arch_map": {
+          "musl": {
+            "amd64": "x64-musl"
+          }
+        }
+      }
+    },
+    {
+      "name": "go",
+      "summary": "Go from go.dev, installed side by side",
+      "category": "runtime",
+      "strategy": "archive",
+      "binaries": [
+        "go"
+      ],
+      "version_args": [
+        "version"
+      ],
+      "version_regex": "go(\\d+\\.\\d+(?:\\.\\d+)?)",
+      "shims": [
+        "go"
+      ],
+      "project_files": [
+        ".go-version"
+      ],
+      "runtime_env": [
+        [
+          "GOROOT",
+          "{prefix}"
+        ]
+      ],
+      "fallback_packages": {
+        "debian": [
+          "golang"
+        ],
+        "rhel": [
+          "golang"
+        ],
+        "arch": [
+          "go"
+        ],
+        "suse": [
+          "go"
+        ],
+        "alpine": [
+          "go"
+        ]
+      },
+      "archive": {
+        "format": "tar.gz",
+        "url": "https://go.dev/dl/go{version}.linux-{arch}.tar.gz",
+        "checksum_format": "pinned",
+        "arch_map": {
+          "amd64": "amd64",
+          "arm64": "arm64"
+        }
+      }
+    },
+    {
+      "name": "python",
+      "summary": "Python from distro packages, switched with a user shim",
+      "category": "runtime",
+      "strategy": "package",
+      "binaries": [
+        "python3"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "Python (\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "python3",
+        "python"
+      ],
+      "project_files": [
+        ".python-version"
+      ],
+      "coexist_dirs": [
+        ".pyenv"
+      ],
+      "packages": {
+        "debian": [
+          "python3"
+        ],
+        "rhel": [
+          "python3"
+        ],
+        "arch": [
+          "python"
+        ],
+        "suse": [
+          "python3"
+        ],
+        "alpine": [
+          "python3"
+        ]
+      },
+      "versioned_packages": {
+        "debian": [
+          "python{major}.{minor}"
+        ],
+        "rhel": [
+          "python{major}.{minor}"
+        ],
+        "alpine": [
+          "python{major}"
+        ]
+      },
+      "system_bins": [
+        "python{mm}"
+      ],
+      "notes": "The shim selects a version. /usr/bin/python3 is left unchanged so system scripts keep working."
+    },
+    {
+      "name": "rust",
+      "summary": "Rust via the official rustup-init binary, after a checksum check",
+      "category": "runtime",
+      "strategy": "rustup",
+      "binaries": [
+        "rustc"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "rustup",
+        "rustc",
+        "cargo"
+      ],
+      "coexist_dirs": [
+        ".rustup",
+        ".cargo"
+      ],
+      "archive": {
+        "format": "file",
+        "url": "https://static.rust-lang.org/rustup/dist/{arch}/rustup-init",
+        "checksum_url": "https://static.rust-lang.org/rustup/dist/{arch}/rustup-init.sha256",
+        "checksum_format": "sums",
+        "arch_map": {
+          "amd64": "x86_64-unknown-linux-gnu",
+          "arm64": "aarch64-unknown-linux-gnu"
+        },
+        "filename": "rustup-init"
+      }
+    },
+    {
+      "name": "java",
+      "summary": "OpenJDK from the distro, with Debian alternatives when versioned",
+      "category": "runtime",
+      "strategy": "package",
+      "binaries": [
+        "java"
+      ],
+      "version_args": [
+        "-version"
+      ],
+      "version_regex": "(\\d+\\.\\d+(?:\\.\\d+)?)",
+      "shims": [
+        "java"
+      ],
+      "project_files": [
+        ".java-version"
+      ],
+      "packages": {
+        "debian": [
+          "default-jdk"
+        ],
+        "rhel": [
+          "java-latest-openjdk-devel"
+        ],
+        "arch": [
+          "jdk-openjdk"
+        ],
+        "suse": [
+          "java-devel"
+        ],
+        "alpine": [
+          "openjdk21"
+        ]
+      },
+      "versioned_packages": {
+        "debian": [
+          "openjdk-{major}-jdk"
+        ],
+        "rhel": [
+          "java-{major}-openjdk-devel"
+        ],
+        "alpine": [
+          "openjdk{major}"
+        ]
+      },
+      "alternatives": [
+        [
+          "java",
+          "/usr/lib/jvm/java-{major}-openjdk-{arch}/bin/java"
+        ]
+      ]
+    },
+    {
+      "name": "ruby",
+      "summary": "Ruby from the distro packages",
+      "category": "runtime",
+      "strategy": "package",
+      "binaries": [
+        "ruby"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "project_files": [
+        ".ruby-version"
+      ],
+      "packages": {
+        "debian": [
+          "ruby"
+        ],
+        "rhel": [
+          "ruby"
+        ],
+        "arch": [
+          "ruby"
+        ],
+        "suse": [
+          "ruby"
+        ],
+        "alpine": [
+          "ruby"
+        ]
+      }
+    },
+    {
+      "name": "dotnet",
+      "summary": "The .NET SDK from the distro, where a package exists",
+      "category": "runtime",
+      "strategy": "package",
+      "binaries": [
+        "dotnet"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [],
+        "rhel": [
+          "dotnet-sdk-8.0"
+        ],
+        "arch": [
+          "dotnet-sdk"
+        ],
+        "suse": [
+          "dotnet-sdk"
+        ],
+        "alpine": []
+      },
+      "versioned_packages": {
+        "rhel": [
+          "dotnet-sdk-{major}.0"
+        ]
+      },
+      "notes": "Debian and Alpine do not ship the Microsoft SDK in the default repositories. DevForge will not add a third-party apt repository."
+    },
+    {
+      "name": "bun",
+      "summary": "Bun from the official GitHub release",
+      "category": "runtime",
+      "strategy": "archive",
+      "binaries": [
+        "bun"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "bun"
+      ],
+      "project_files": [
+        ".bun-version"
+      ],
+      "archive": {
+        "format": "zip",
+        "url": "https://github.com/oven-sh/bun/releases/download/bun-v{version}/bun-linux-{arch}.zip",
+        "checksum_format": "pinned",
+        "arch_map": {
+          "amd64": "x64",
+          "arm64": "aarch64"
+        },
+        "libc_arch_map": {
+          "musl": {
+            "amd64": "x64-musl",
+            "arm64": "aarch64-musl"
+          }
+        }
+      }
+    },
+    {
+      "name": "deno",
+      "summary": "Deno from the official GitHub release",
+      "category": "runtime",
+      "strategy": "archive",
+      "binaries": [
+        "deno"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "deno"
+      ],
+      "project_files": [
+        ".deno-version"
+      ],
+      "archive": {
+        "format": "zip",
+        "url": "https://github.com/denoland/deno/releases/download/v{version}/deno-{arch}.zip",
+        "checksum_format": "pinned",
+        "arch_map": {
+          "amd64": "x86_64-unknown-linux-gnu",
+          "arm64": "aarch64-unknown-linux-gnu"
+        }
+      }
+    },
+    {
+      "name": "nvm",
+      "summary": "Detect an existing nvm install and leave it alone",
+      "category": "manager",
+      "strategy": "external",
+      "coexist_dirs": [
+        ".nvm"
+      ],
+      "coexist_env": [
+        "NVM_DIR"
+      ],
+      "notes": "DevForge does not install nvm, because that means running a remote shell script. Existing nvm installs are left in place. Install Node with `devforge install node`."
+    },
+    {
+      "name": "npm",
+      "summary": "npm, shipped with Node and updated in place",
+      "category": "manager",
+      "strategy": "npm",
+      "binaries": [
+        "npm"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "notes": "npm is part of a Node installation. Uninstall the Node version instead of uninstalling npm on its own."
+    },
+    {
+      "name": "pnpm",
+      "summary": "pnpm standalone binary from the official GitHub release",
+      "category": "manager",
+      "strategy": "archive",
+      "binaries": [
+        "pnpm"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "pnpm"
+      ],
+      "archive": {
+        "format": "tar.gz",
+        "url": "https://github.com/pnpm/pnpm/releases/download/v{version}/pnpm-linux-{arch}.tar.gz",
+        "checksum_format": "pinned",
+        "arch_map": {
+          "amd64": "x64",
+          "arm64": "arm64"
+        },
+        "libc_arch_map": {
+          "musl": {
+            "amd64": "x64-musl",
+            "arm64": "arm64-musl"
+          }
+        }
+      }
+    },
+    {
+      "name": "yarn",
+      "summary": "Yarn classic from the official GitHub release",
+      "category": "manager",
+      "strategy": "archive",
+      "binaries": [
+        "yarn"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "yarn"
+      ],
+      "archive": {
+        "format": "tar.gz",
+        "url": "https://github.com/yarnpkg/yarn/releases/download/v{version}/yarn-v{version}.tar.gz",
+        "checksum_format": "pinned",
+        "arch_map": {}
+      }
+    },
+    {
+      "name": "composer",
+      "summary": "Composer PHAR from getcomposer.org",
+      "category": "manager",
+      "strategy": "archive",
+      "binaries": [
+        "composer"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "composer"
+      ],
+      "shim_kind": "phar",
+      "fallback_packages": {
+        "debian": [
+          "composer"
+        ],
+        "rhel": [
+          "composer"
+        ],
+        "arch": [
+          "composer"
+        ],
+        "suse": [
+          "composer"
+        ],
+        "alpine": [
+          "composer"
+        ]
+      },
+      "archive": {
+        "format": "file",
+        "url": "https://getcomposer.org/download/{version}/composer.phar",
+        "checksum_format": "pinned",
+        "filename": "composer.phar",
+        "arch_map": {}
+      }
+    },
+    {
+      "name": "pipx",
+      "summary": "pipx from the distro packages",
+      "category": "manager",
+      "strategy": "package",
+      "binaries": [
+        "pipx"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+(?:\\.\\d+)?)",
+      "packages": {
+        "debian": [
+          "pipx"
+        ],
+        "rhel": [
+          "pipx"
+        ],
+        "arch": [
+          "python-pipx"
+        ],
+        "suse": [
+          "python3-pipx"
+        ],
+        "alpine": [
+          "pipx"
+        ]
+      }
+    },
+    {
+      "name": "uv",
+      "summary": "uv from the official Astral release",
+      "category": "manager",
+      "strategy": "archive",
+      "binaries": [
+        "uv"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "uv",
+        "uvx"
+      ],
+      "archive": {
+        "format": "tar.gz",
+        "url": "https://github.com/astral-sh/uv/releases/download/{version}/uv-{arch}.tar.gz",
+        "checksum_url": "https://github.com/astral-sh/uv/releases/download/{version}/uv-{arch}.tar.gz.sha256",
+        "checksum_format": "sums",
+        "arch_map": {
+          "amd64": "x86_64-unknown-linux-gnu",
+          "arm64": "aarch64-unknown-linux-gnu"
+        },
+        "libc_arch_map": {
+          "musl": {
+            "amd64": "x86_64-unknown-linux-musl",
+            "arm64": "aarch64-unknown-linux-musl"
+          }
+        }
+      }
+    },
+    {
+      "name": "pyenv",
+      "summary": "Detect an existing pyenv install and leave it alone",
+      "category": "manager",
+      "strategy": "external",
+      "binaries": [
+        "pyenv"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "coexist_dirs": [
+        ".pyenv"
+      ],
+      "notes": "DevForge does not install pyenv through its remote installer. Existing pyenv installs are left in place. Install Python with `devforge install python`."
+    },
+    {
+      "name": "docker",
+      "summary": "Docker Engine and Compose from the distro packages",
+      "category": "infra",
+      "strategy": "package",
+      "binaries": [
+        "docker"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "docker.io",
+          "docker-compose"
+        ],
+        "rhel": [
+          "docker",
+          "docker-compose-plugin"
+        ],
+        "arch": [
+          "docker",
+          "docker-compose"
+        ],
+        "suse": [
+          "docker",
+          "docker-compose"
+        ],
+        "alpine": [
+          "docker",
+          "docker-cli-compose"
+        ]
+      },
+      "linux_group": "docker",
+      "services": [
+        "docker"
+      ],
+      "extra_checks": [
+        [
+          "docker",
+          "compose",
+          "version"
+        ]
+      ]
+    },
+    {
+      "name": "git",
+      "summary": "Git from the distro packages",
+      "category": "infra",
+      "strategy": "package",
+      "binaries": [
+        "git"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "git"
+        ],
+        "rhel": [
+          "git"
+        ],
+        "arch": [
+          "git"
+        ],
+        "suse": [
+          "git"
+        ],
+        "alpine": [
+          "git"
+        ]
+      }
+    },
+    {
+      "name": "kubectl",
+      "summary": "kubectl from the official Kubernetes release",
+      "category": "infra",
+      "strategy": "archive",
+      "binaries": [
+        "kubectl"
+      ],
+      "version_args": [
+        "version",
+        "--client"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "kubectl"
+      ],
+      "archive": {
+        "format": "file",
+        "url": "https://dl.k8s.io/release/v{version}/bin/linux/{arch}/kubectl",
+        "checksum_url": "https://dl.k8s.io/release/v{version}/bin/linux/{arch}/kubectl.sha256",
+        "checksum_format": "bare",
+        "arch_map": {
+          "amd64": "amd64",
+          "arm64": "arm64"
+        },
+        "filename": "kubectl"
+      }
+    },
+    {
+      "name": "helm",
+      "summary": "Helm from the official release",
+      "category": "infra",
+      "strategy": "archive",
+      "binaries": [
+        "helm"
+      ],
+      "version_args": [
+        "version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "helm"
+      ],
+      "archive": {
+        "format": "tar.gz",
+        "url": "https://get.helm.sh/helm-v{version}-linux-{arch}.tar.gz",
+        "checksum_url": "https://get.helm.sh/helm-v{version}-linux-{arch}.tar.gz.sha256sum",
+        "checksum_format": "sums",
+        "arch_map": {
+          "amd64": "amd64",
+          "arm64": "arm64"
+        }
+      }
+    },
+    {
+      "name": "terraform",
+      "summary": "Terraform from HashiCorp releases",
+      "category": "infra",
+      "strategy": "archive",
+      "binaries": [
+        "terraform"
+      ],
+      "version_args": [
+        "version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "terraform"
+      ],
+      "archive": {
+        "format": "zip",
+        "url": "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_linux_{arch}.zip",
+        "checksum_url": "https://releases.hashicorp.com/terraform/{version}/terraform_{version}_SHA256SUMS",
+        "checksum_format": "sums",
+        "arch_map": {
+          "amd64": "amd64",
+          "arm64": "arm64"
+        }
+      }
+    },
+    {
+      "name": "mysql",
+      "summary": "MySQL server from the distro packages",
+      "category": "service",
+      "strategy": "package",
+      "binaries": [
+        "mysql"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "mysql-server"
+        ],
+        "rhel": [
+          "mysql-server"
+        ],
+        "arch": [
+          "mysql"
+        ],
+        "suse": [
+          "mysql"
+        ],
+        "alpine": [
+          "mysql"
+        ]
+      },
+      "services": [
+        "mysql"
+      ]
+    },
+    {
+      "name": "mariadb",
+      "summary": "MariaDB server from the distro packages",
+      "category": "service",
+      "strategy": "package",
+      "binaries": [
+        "mariadb"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "mariadb-server"
+        ],
+        "rhel": [
+          "mariadb-server"
+        ],
+        "arch": [
+          "mariadb"
+        ],
+        "suse": [
+          "mariadb"
+        ],
+        "alpine": [
+          "mariadb"
+        ]
+      },
+      "services": [
+        "mariadb"
+      ]
+    },
+    {
+      "name": "postgresql",
+      "summary": "PostgreSQL from the distro packages",
+      "category": "service",
+      "strategy": "package",
+      "binaries": [
+        "psql"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+(?:\\.\\d+)?)",
+      "packages": {
+        "debian": [
+          "postgresql"
+        ],
+        "rhel": [
+          "postgresql-server"
+        ],
+        "arch": [
+          "postgresql"
+        ],
+        "suse": [
+          "postgresql-server"
+        ],
+        "alpine": [
+          "postgresql"
+        ]
+      },
+      "services": [
+        "postgresql"
+      ]
+    },
+    {
+      "name": "redis",
+      "summary": "Redis from the distro packages",
+      "category": "service",
+      "strategy": "package",
+      "binaries": [
+        "redis-server"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "redis-server"
+        ],
+        "rhel": [
+          "redis"
+        ],
+        "arch": [
+          "redis"
+        ],
+        "suse": [
+          "redis"
+        ],
+        "alpine": [
+          "redis"
+        ]
+      },
+      "services": [
+        "redis"
+      ]
+    },
+    {
+      "name": "nginx",
+      "summary": "Nginx from the distro packages",
+      "category": "service",
+      "strategy": "package",
+      "binaries": [
+        "nginx"
+      ],
+      "version_args": [
+        "-v"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "nginx"
+        ],
+        "rhel": [
+          "nginx"
+        ],
+        "arch": [
+          "nginx"
+        ],
+        "suse": [
+          "nginx"
+        ],
+        "alpine": [
+          "nginx"
+        ]
+      },
+      "services": [
+        "nginx"
+      ]
+    },
+    {
+      "name": "caddy",
+      "summary": "Caddy from the distro packages, when the distro ships it",
+      "category": "service",
+      "strategy": "package",
+      "binaries": [
+        "caddy"
+      ],
+      "version_args": [
+        "version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "caddy"
+        ],
+        "rhel": [
+          "caddy"
+        ],
+        "arch": [
+          "caddy"
+        ],
+        "suse": [
+          "caddy"
+        ],
+        "alpine": [
+          "caddy"
+        ]
+      },
+      "services": [
+        "caddy"
+      ],
+      "notes": "Some Debian releases do not ship Caddy in the default repositories. DevForge will not add a third-party apt repository."
+    },
+    {
+      "name": "build",
+      "summary": "Compiler toolchain for the detected distro family",
+      "category": "utility",
+      "strategy": "package",
+      "binaries": [
+        "gcc"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "build-essential"
+        ],
+        "rhel": [
+          "gcc",
+          "gcc-c++",
+          "make"
+        ],
+        "arch": [
+          "base-devel"
+        ],
+        "suse": [
+          "gcc",
+          "make"
+        ],
+        "alpine": [
+          "build-base"
+        ]
+      }
+    },
+    {
+      "name": "curl",
+      "summary": "curl from the distro packages",
+      "category": "utility",
+      "strategy": "package",
+      "binaries": [
+        "curl"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "curl"
+        ],
+        "rhel": [
+          "curl"
+        ],
+        "arch": [
+          "curl"
+        ],
+        "suse": [
+          "curl"
+        ],
+        "alpine": [
+          "curl"
+        ]
+      }
+    },
+    {
+      "name": "jq",
+      "summary": "jq from the distro packages",
+      "category": "utility",
+      "strategy": "package",
+      "binaries": [
+        "jq"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+(?:\\.\\d+)?)",
+      "packages": {
+        "debian": [
+          "jq"
+        ],
+        "rhel": [
+          "jq"
+        ],
+        "arch": [
+          "jq"
+        ],
+        "suse": [
+          "jq"
+        ],
+        "alpine": [
+          "jq"
+        ]
+      }
+    },
+    {
+      "name": "tmux",
+      "summary": "tmux from the distro packages",
+      "category": "utility",
+      "strategy": "package",
+      "binaries": [
+        "tmux"
+      ],
+      "version_args": [
+        "-V"
+      ],
+      "version_regex": "(\\d+\\.\\d+(?:\\.\\d+)?)",
+      "packages": {
+        "debian": [
+          "tmux"
+        ],
+        "rhel": [
+          "tmux"
+        ],
+        "arch": [
+          "tmux"
+        ],
+        "suse": [
+          "tmux"
+        ],
+        "alpine": [
+          "tmux"
+        ]
+      }
+    },
+    {
+      "name": "ripgrep",
+      "summary": "ripgrep from the distro packages",
+      "category": "utility",
+      "strategy": "package",
+      "binaries": [
+        "rg"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "ripgrep"
+        ],
+        "rhel": [
+          "ripgrep"
+        ],
+        "arch": [
+          "ripgrep"
+        ],
+        "suse": [
+          "ripgrep"
+        ],
+        "alpine": [
+          "ripgrep"
+        ]
+      }
+    },
+    {
+      "name": "openssh",
+      "summary": "OpenSSH client from the distro packages",
+      "category": "utility",
+      "strategy": "package",
+      "binaries": [
+        "ssh"
+      ],
+      "version_args": [
+        "-V"
+      ],
+      "version_regex": "OpenSSH_(\\d+\\.\\d+(?:p\\d+)?)",
+      "packages": {
+        "debian": [
+          "openssh-client"
+        ],
+        "rhel": [
+          "openssh-clients"
+        ],
+        "arch": [
+          "openssh"
+        ],
+        "suse": [
+          "openssh"
+        ],
+        "alpine": [
+          "openssh-client"
+        ]
+      }
+    }
+  ]
+}

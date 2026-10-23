@@ -1,0 +1,17 @@
+{
+  "tool": "terraform",
+  "latest": "1.17.0",
+  "versions": [
+    "1.17.0"
+  ],
+  "refresh": {
+    "format": "github",
+    "url": "https://api.github.com/repos/hashicorp/terraform/releases/latest"
+  },
+  "sha256": {
+    "1.17.0": {
+      "amd64": "c168cab7c637a8769fdb90089ddd19de701bc6ff8aca64dc2e2185fe46f59f67",
+      "arm64": "f32478134ffc6d710eec474bbd316652cdddc0f4e336973a3745e8d3a3309cdf"
+    }
+  }
+}

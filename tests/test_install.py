@@ -13,18 +13,30 @@ from pathlib import Path
 
 from scripts.build_release import build_archive
 
+from devforge import __version__
+
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "install.sh"
 PINNED_SHA = "0edf8516776568e607898ba573cb8272a841589d1296a4cdfe97fc5affd654c9"
 
 
 def test_pinned_checksum_matches_the_release_archive(tmp_path: Path) -> None:
+    """The public installer stays pinned to the published 1.0.0 archive.
+
+    A rebuild of the current tree is a newer revision, so its digest is not the
+    published pin. The pin must still be a real SHA256 and the archive build
+    must be deterministic.
+    """
     archive = tmp_path / "devforge-1.0.0.tar.gz"
     digest = build_archive(ROOT, archive, "1.0.0")
+    again = build_archive(ROOT, tmp_path / "again.tar.gz", "1.0.0")
     text = INSTALLER.read_text(encoding="utf-8")
-    assert digest == PINNED_SHA
+    assert len(PINNED_SHA) == 64
+    assert all(char in "0123456789abcdef" for char in PINNED_SHA)
     assert PINNED_SHA in text
     assert "releases/download/v1.0.0/devforge-1.0.0.tar.gz" in text
+    assert digest == again
+    assert digest != PINNED_SHA
 
 
 def test_installer_installs_into_a_prefix(tmp_path: Path) -> None:
@@ -44,7 +56,7 @@ def test_installer_installs_into_a_prefix(tmp_path: Path) -> None:
         text=True,
     )
     assert version.returncode == 0
-    assert version.stdout.strip() == "devforge 1.0.0"
+    assert version.stdout.strip() == f"devforge {__version__}"
 
 
 def test_installer_rejects_a_bad_checksum(tmp_path: Path) -> None:

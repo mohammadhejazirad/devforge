@@ -1,19 +1,42 @@
-"""Argument parsing for the DevForge command."""
+"""Argument parsing and command dispatch."""
 
 from __future__ import annotations
 
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TextIO
 
 from devforge import __version__
 from devforge import strings as s
+from devforge.commands.files import (
+    cmd_apply,
+    cmd_export,
+    cmd_preset_apply,
+    cmd_preset_list,
+    cmd_shell,
+)
+from devforge.commands.inspect import cmd_doctor, cmd_info, cmd_list, cmd_status, cmd_versions
+from devforge.commands.lifecycle import cmd_install, cmd_uninstall, cmd_update, cmd_use
+from devforge.commands.network import (
+    cmd_dns_restore,
+    cmd_dns_set,
+    cmd_dns_show,
+    cmd_dns_test,
+    cmd_mirror_list,
+    cmd_mirror_reset,
+    cmd_mirror_set,
+    cmd_mirror_test,
+)
+from devforge.context import Context, make_context
+from devforge.tools.base import Scope
+from devforge.tui import cmd_tui
 from devforge.ui import Printer
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Return the top-level parser. Subcommands are added as they land."""
+    """Return the top-level parser, including every subcommand."""
     parser = argparse.ArgumentParser(
         prog="devforge",
         description=s.DESCRIPTION,
@@ -35,6 +58,105 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-color", action="store_true", help=s.HELP_NO_COLOR)
     parser.add_argument("-q", "--quiet", action="store_true", help=s.HELP_QUIET)
     parser.add_argument("-v", "--verbose", action="count", default=0, help=s.HELP_VERBOSE)
+
+    commands = parser.add_subparsers(dest="command")
+
+    commands.add_parser("info", help="Show the detected operating system and privileges.")
+    doctor = commands.add_parser("doctor", help="Check the machine and every managed tool.")
+    doctor.add_argument("--offline", action="store_true", help="Do not contact the network.")
+    doctor.add_argument("--online", action="store_true", help="Probe a few upstream URLs.")
+
+    commands.add_parser("list", help="List every tool DevForge can manage.")
+    status = commands.add_parser("status", help="Show installed versions and available updates.")
+    status.add_argument("tool", nargs="?", help="One tool. Omit it to show every tool.")
+
+    versions = commands.add_parser("versions", help="List known versions for one tool.")
+    versions.add_argument("tool")
+    versions.add_argument(
+        "--refresh", action="store_true", help="Download the upstream index first."
+    )
+
+    install = commands.add_parser(
+        "install", help="Install a tool, keeping other versions in place."
+    )
+    install.add_argument("tool")
+    install.add_argument(
+        "version", nargs="?", help="Version to install. Omit it for the preferred one."
+    )
+    install.add_argument(
+        "--no-default", action="store_true", help="Do not make this version the default."
+    )
+    install.add_argument(
+        "--package",
+        action="store_true",
+        help="Use the distro package even when an official archive exists.",
+    )
+
+    update = commands.add_parser("update", help="Update one tool, or every installed tool.")
+    update.add_argument("tool", nargs="?")
+    update.add_argument(
+        "--all", action="store_true", help="Update every tool that is already installed."
+    )
+
+    use = commands.add_parser(
+        "use", help="Select a version globally, for a project, or for this shell."
+    )
+    use.add_argument("tool")
+    use.add_argument("version")
+    scope = use.add_mutually_exclusive_group()
+    scope.add_argument(
+        "--global", dest="scope_global", action="store_true", help="Set the user default."
+    )
+    scope.add_argument("--project", action="store_true", help="Pin the version in this directory.")
+    scope.add_argument(
+        "--shell", action="store_true", help="Print an export for the current shell."
+    )
+
+    pin = commands.add_parser("pin", help="Pin a version in the current directory.")
+    pin.add_argument("tool")
+    pin.add_argument("version")
+
+    uninstall = commands.add_parser("uninstall", help="Remove a managed version or distro package.")
+    uninstall.add_argument("tool")
+    uninstall.add_argument("version", nargs="?")
+    uninstall.add_argument(
+        "--purge", action="store_true", help="Also remove package configuration."
+    )
+
+    mirror = commands.add_parser("mirror", help="List, select, test, or clear a mirror profile.")
+    mirror_cmds = mirror.add_subparsers(dest="mirror_action", required=True)
+    mirror_cmds.add_parser("list", help="Show profiles. The default is upstream.")
+    mirror_set = mirror_cmds.add_parser("set", help="Use a profile. Pass upstream to clear it.")
+    mirror_set.add_argument("name")
+    mirror_test = mirror_cmds.add_parser("test", help="Time a request through a profile.")
+    mirror_test.add_argument("name", nargs="?")
+    mirror_cmds.add_parser("reset", help="Clear the profile and restore a Docker backup.")
+
+    dns = commands.add_parser("dns", help="Show, set, test, or restore DNS.")
+    dns_cmds = dns.add_subparsers(dest="dns_action", required=True)
+    dns_cmds.add_parser("show", help="Show the resolver and the shipped presets.")
+    dns_set = dns_cmds.add_parser("set", help="Switch to a named preset.")
+    dns_set.add_argument("name")
+    dns_cmds.add_parser("test", help="Resolve example.com.")
+    dns_cmds.add_parser("restore", help="Restore the DevForge DNS backup.")
+
+    preset = commands.add_parser("preset", help="List or apply a tool preset.")
+    preset_cmds = preset.add_subparsers(dest="preset_action", required=True)
+    preset_cmds.add_parser("list", help="Show the shipped presets.")
+    preset_apply = preset_cmds.add_parser("apply", help="Install every tool in a preset.")
+    preset_apply.add_argument("name")
+
+    apply = commands.add_parser("apply", help="Install the tools listed in a JSON or TOML file.")
+    apply.add_argument("file")
+
+    commands.add_parser("export", help="Print a JSON manifest of installed tools.")
+
+    shell = commands.add_parser("shell", help="Install or remove the DevForge PATH block.")
+    shell_cmds = shell.add_subparsers(dest="shell_action", required=True)
+    shell_cmds.add_parser("install", help="Add the shim directory to the shell rc file.")
+    shell_cmds.add_parser("remove", help="Remove the managed block from the shell rc file.")
+
+    commands.add_parser("tui", help="Open a numbered menu. Requires a terminal.")
     return parser
 
 
@@ -56,10 +178,104 @@ def main(
         out=out,
         err=err,
     )
-    # Parsed so help can document them. No command consumes these yet.
-    del args.json
-    printer.error(s.ERR_NO_COMMAND)
-    parser.print_help(printer.error_stream)
+    if not args.command:
+        printer.error(s.ERR_NO_COMMAND)
+        parser.print_help(printer.error_stream)
+        return 2
+    ctx = make_context(
+        printer,
+        dry_run=args.dry_run,
+        assume_yes=args.yes,
+        as_json=args.json,
+        offline=bool(getattr(args, "offline", False)),
+    )
+    ctx.log.info(" ".join(sys.argv if argv is None else ["devforge", *list(argv)]))
+    try:
+        return _dispatch(ctx, args)
+    except KeyboardInterrupt:
+        printer.error(s.ERR_INTERRUPTED)
+        return 1
+
+
+def _dispatch(ctx: Context, args: argparse.Namespace) -> int:
+    command = args.command
+    if command == "info":
+        return cmd_info(ctx)
+    if command == "doctor":
+        return cmd_doctor(ctx, online=bool(args.online) and not bool(args.offline))
+    if command == "list":
+        return cmd_list(ctx)
+    if command == "status":
+        return cmd_status(ctx, args.tool)
+    if command == "versions":
+        return cmd_versions(ctx, args.tool, refresh=bool(args.refresh))
+    if command == "install":
+        return cmd_install(
+            ctx,
+            args.tool,
+            args.version,
+            make_default=not args.no_default,
+            use_package=bool(args.package),
+        )
+    if command == "update":
+        return cmd_update(ctx, args.tool, all_tools_flag=bool(args.all))
+    if command == "use":
+        if args.shell:
+            scope = Scope.SHELL
+        elif args.project:
+            scope = Scope.PROJECT
+        else:
+            scope = Scope.GLOBAL
+        return cmd_use(ctx, args.tool, args.version, scope=scope)
+    if command == "pin":
+        return cmd_use(ctx, args.tool, args.version, scope=Scope.PROJECT)
+    if command == "uninstall":
+        return cmd_uninstall(ctx, args.tool, args.version, purge=bool(args.purge))
+    if command == "mirror":
+        return _mirror(ctx, args)
+    if command == "dns":
+        return _dns(ctx, args)
+    if command == "preset":
+        if args.preset_action == "list":
+            return cmd_preset_list(ctx)
+        return cmd_preset_apply(ctx, args.name)
+    if command == "apply":
+        return cmd_apply(ctx, Path(args.file))
+    if command == "export":
+        return cmd_export(ctx)
+    if command == "shell":
+        return cmd_shell(ctx, str(args.shell_action))
+    if command == "tui":
+        return cmd_tui(ctx)
+    ctx.printer.error(s.ERR_UNKNOWN_COMMAND.format(name=command))
+    return 2
+
+
+def _mirror(ctx: Context, args: argparse.Namespace) -> int:
+    action = args.mirror_action
+    if action == "list":
+        return cmd_mirror_list(ctx)
+    if action == "set":
+        return cmd_mirror_set(ctx, args.name)
+    if action == "test":
+        return cmd_mirror_test(ctx, args.name)
+    if action == "reset":
+        return cmd_mirror_reset(ctx)
+    ctx.printer.error(s.ERR_UNKNOWN_COMMAND.format(name=action))
+    return 2
+
+
+def _dns(ctx: Context, args: argparse.Namespace) -> int:
+    action = args.dns_action
+    if action == "show":
+        return cmd_dns_show(ctx)
+    if action == "set":
+        return cmd_dns_set(ctx, args.name)
+    if action == "test":
+        return cmd_dns_test(ctx)
+    if action == "restore":
+        return cmd_dns_restore(ctx)
+    ctx.printer.error(s.ERR_UNKNOWN_COMMAND.format(name=action))
     return 2
 
 

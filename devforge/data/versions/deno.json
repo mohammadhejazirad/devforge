@@ -1,0 +1,17 @@
+{
+  "tool": "deno",
+  "latest": "2.9.8",
+  "versions": [
+    "2.9.8"
+  ],
+  "refresh": {
+    "format": "github",
+    "url": "https://api.github.com/repos/denoland/deno/releases/latest"
+  },
+  "sha256": {
+    "2.9.8": {
+      "amd64": "e890975bc2549807bbcc0b584ffafda72cc7c93349dd99c80483dd784f6c4609",
+      "arm64": "d49596c20b9788cf8f5d8ddf644103d4bde56ed239753f0bdb92ba9361d51905"
+    }
+  }
+}

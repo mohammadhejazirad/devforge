@@ -1,0 +1,17 @@
+{
+  "name": "iran",
+  "verified": false,
+  "description": "Unverified community suggestions for networks inside Iran. Docker registry mirrors are opt-in and checksums stay on. This profile does not replace distro package repositories.",
+  "rewrites": [
+    {
+      "ecosystem": "docker",
+      "upstream": "https://registry-1.docker.io",
+      "mirror": "https://docker.arvancloud.ir"
+    },
+    {
+      "ecosystem": "docker",
+      "upstream": "https://docker.io",
+      "mirror": "https://docker.iranserver.com"
+    }
+  ]
+}

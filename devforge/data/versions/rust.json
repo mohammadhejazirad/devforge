@@ -1,0 +1,11 @@
+{
+  "tool": "rust",
+  "latest": "",
+  "versions": [],
+  "sha256": {
+    "rustup-init": {
+      "amd64": "5be191e8c70a5007074254cb74d78dbfdd25cd5a61c27de7b8e5410122ec24f4",
+      "arm64": "a9c168dbea81a84671c6b7a5c1795cb0eb699020110d107ddfca427bd797e697"
+    }
+  }
+}

@@ -1,69 +1,250 @@
 # DevForge
 
-**Version 1.0.0.** This is the first installable release. The command below
-downloads the installer, which then downloads a pinned archive, checks its
-SHA256, and installs the `devforge` command. This release prints help and
-version. Language and service provisioning is not in 1.0.0 yet.
+DevForge installs, updates, switches, pins, and removes development tools on
+Linux. It detects the machine, shows a plan, and changes the system only after
+you confirm. The same commands work on a desktop and on a server.
 
-DevForge is a terminal-based provisioning and version-management tool for
-developers on Linux, for both desktops and servers. After a fresh OS install,
-you should be productive in minutes instead of hours.
+This tree is **version 1.1.0**. It manages languages, package tools,
+infrastructure, databases, and everyday utilities.
 
-## What it aims to do
-
-- Install, update, switch, pin, and remove development tooling.
-- Detect your distro, architecture, init system, and whether you are on a
-  desktop or a server, without hardcoding any single distribution.
-- Keep everything safe by default: plan first, show the commands, ask for
-  confirmation, and support `--dry-run` for every mutating operation.
-- Stay usable on slow, filtered, or sanctioned networks through opt-in,
-  reversible mirror profiles and DNS switching.
-- Never depend on a GUI, never require pip packages at install time, and never
-  send telemetry.
+The published one-line installer still installs **release 1.0.0**. That
+release only prints help and version. Use a checkout of this tree, described
+below, until a newer release is published. A Persian walkthrough is in
+[docs/guide.fa.md](docs/guide.fa.md).
 
 ## Requirements
 
-- Linux (Debian/Ubuntu, Fedora/RHEL family, Arch/Manjaro, openSUSE, Alpine).
-- Python 3.9 or newer, standard library only.
+- Linux. Tested families: Debian/Ubuntu (including Mint and Pop!_OS),
+  Fedora/RHEL (Rocky, Alma, CentOS Stream), Arch/Manjaro, openSUSE, and Alpine.
+- Python 3.9 or newer. The program uses only the standard library.
+- A normal user with `sudo` for distro packages. Official archives install
+  into your home directory and do not need root.
 
 ## Install
 
-Linux and Python 3.9 or newer. Copy this command:
+### From a checkout (version 1.1.0)
+
+```bash
+git clone https://github.com/mohammadhejazirad/devforge.git
+cd devforge
+python3 -m devforge --help
+```
+
+You can also install the checkout as a command:
+
+```bash
+python3 -m pip install --user -e .
+devforge --version
+```
+
+That prints `devforge 1.1.0` from this tree.
+
+### Published installer (release 1.0.0)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
 ```
 
-The installer refuses anything except Linux. It downloads
-`devforge-1.0.0.tar.gz` from the GitHub release, checks the SHA256 pinned in
-`install.sh`, and installs into `~/.local` (or `/usr/local` when run as root).
-It does not run any other remote script. If `~/.local/bin` is not on `PATH`,
-the installer prints the export line to add.
+`install.sh` downloads `devforge-1.0.0.tar.gz` from the GitHub release, checks
+the SHA256 pinned in the script, and installs into `~/.local` (or `/usr/local`
+when run as root). It does not run any other remote script. That archive does
+not include the tool manager yet. Do not expect `devforge install` from the
+curl command until a release newer than 1.0.0 is published.
 
-To install from a checkout instead:
+## What you can manage
+
+| Kind | Tools |
+| --- | --- |
+| Languages | PHP, Node.js, Go, Python, Rust, Java, Ruby, .NET, Bun, Deno |
+| Package tools | NVM, npm, pnpm, Yarn, Composer, pipx, uv, pyenv |
+| Infrastructure | Docker and Compose, Git, kubectl, Helm, Terraform |
+| Services | MySQL, MariaDB, PostgreSQL, Redis, Nginx, Caddy |
+| Utilities | build tools, curl, jq, tmux, ripgrep, OpenSSH |
+
+For every tool, DevForge can show what is installed, list known versions, and
+say whether an update exists. Install, update, switch the default, pin a
+project, uninstall, and doctor are available wherever that action is safe.
+
+Two kinds of install:
+
+- **Archives** (Node, Go, Bun, Deno, pnpm, Yarn, Composer, uv, kubectl, Helm,
+  Terraform) live side by side under `~/.local/share/devforge/tools`. A shim
+  directory is added to `PATH`. Installing Node 24 keeps Node 22.
+- **Distro packages** (PHP, Python, Java, Ruby, databases, Nginx, Docker, and
+  the utilities) use apt, dnf, yum, pacman, zypper, or apk. `install php`
+  installs the distro default. `install php 8.4` asks for the versioned
+  packages on Debian (`php8.4-cli`) and Alpine (`php83`). Other families get
+  the single distro package and a note when the requested version may differ.
+
+DevForge does not replace `/usr/bin/python3`. A Python shim selects
+`python3.13` and leaves the system `python3` alone. PHP and Java alternatives
+are planned only on Debian, and only when the target binary exists.
+
+NVM and pyenv are detected and left alone. DevForge will not run their remote
+installers. npm is the npm that ships with Node: `devforge update npm` runs
+`npm install -g npm@latest`. Rust is installed with the official `rustup-init`
+binary after a checksum check, into the DevForge data directory, unless you
+already have rustup. .NET is installed from distro packages only. On Debian
+and Alpine, where the SDK is not in the default repositories, the plan is
+blocked instead of adding a third-party apt source.
+
+## Everyday commands
+
+Global flags come before the command. Every change supports `--dry-run` and
+asks before it runs. `-y` skips the question. `--json` prints a JSON document
+on stdout.
 
 ```bash
-python3 -m devforge --help
+devforge info
+devforge doctor --offline
+devforge list
+devforge status
+devforge status php
+devforge versions node
+devforge versions node --refresh
+devforge --dry-run install node
+devforge install php 8.4
+devforge use node 24.22.1
+devforge pin python 3.13
+devforge update php
+devforge update --all
+devforge uninstall node 22.23.4
+devforge shell install
+devforge shell remove
+devforge tui
 ```
 
-## Usage
+`status php` prints the installed version, where it came from (`system` or
+`devforge`), the newest version DevForge knows, and whether you can install,
+update, switch, or uninstall it. A missing tool is reported as not installed.
+`update php` installs it when it is missing, upgrades the distro package when
+a newer candidate exists, and prints "already up to date" when nothing newer
+is known. `update` with no name requires `--all`, and `--all` only touches
+tools that are already installed.
 
-All output is English, and every mutating command will follow the same flow:
-build a plan, show it, ask for confirmation (`-y` to skip), and support
-`--dry-run`.
+`use` defaults to a user-wide default. `--project` and `pin` write the tool's
+pin file (for example `.php-version`) and a `.tool-versions` line in the
+current directory. `--shell` prints an `export` and writes nothing.
+
+`doctor` warns about missing tools. It exits 1 when a selected DevForge
+version is missing on disk. Network checks run only with `devforge doctor
+--online`. asdf and mise are noted when their directories exist, and they are
+not modified.
+
+`export` prints a JSON manifest of what is installed. `apply` installs from
+that file. A small TOML subset also works:
+
+```json
+{
+  "tools": {
+    "node": {"version": "24.22.1", "default": true},
+    "git": {}
+  }
+}
+```
+
+```toml
+[tool.node]
+version = "24.22.1"
+default = true
+
+[tool.git]
+```
+
+Presets install a known set in one plan. If any tool in the preset is blocked,
+the whole preset is blocked.
 
 ```bash
-devforge --help
-devforge --version
+devforge preset list
+devforge --dry-run preset apply web-php
 ```
 
-Useful global flags:
+| Preset | Tools |
+| --- | --- |
+| `web-php` | php, composer, node, nginx, git, curl |
+| `node-fullstack` | node, pnpm, git, curl |
+| `go-backend` | go, git, docker |
+| `devops` | docker, kubectl, helm, terraform, git, jq |
 
-- `--dry-run`: show what would happen without changing the system.
-- `-y`, `--yes`: skip confirmation prompts.
-- `--json`: machine-readable output for scripting.
-- `--no-color`: disable color; `NO_COLOR` is honored too.
-- `-q`, `--quiet` and `-v`, `--verbose`: control the amount of output.
+`devforge tui` opens a numbered menu on a terminal. With no command, DevForge
+prints help and exits 2. It does not open the menu.
+
+## Versions DevForge already knows
+
+Indexes in `devforge/data/versions/` are refreshed with `versions <tool>
+--refresh` when the tool publishes an index. Pinned checksums cover the
+builds that were current on 2026-10-23, including Node 26.12.1, 24.22.1,
+22.23.4, and 20.20.2; Go 1.27.3 and 1.26.10; PHP 8.5, 8.4, 8.3, and 8.2;
+Python 3.14, 3.13, 3.12, and 3.11; Java 25, 21, and 17.
+
+`install node` selects the LTS line (24.22.1). `update node` moves to the
+newest known version when that version is newer than the one you have.
+`install node 26.12.1` selects that version and keeps the others. A download without a pinned checksum fetches
+the publisher's checksum file at apply time. Dry-run shows that. DevForge will
+not install an archive it cannot hash.
+
+Go's download URL is `https://go.dev/dl/...`, which redirects to the Go CDN.
+In some regions that CDN returns 404. DevForge reports the download error and
+points at `devforge mirror list`. It does not treat the 404 as "this version
+does not exist," and it does not invent a mirror.
+
+## Mirrors and DNS
+
+Both are off until you ask. The default is the upstream URL, and checksums
+stay on.
+
+```bash
+devforge mirror list
+devforge mirror set iran
+devforge mirror test
+devforge mirror reset
+devforge dns show
+devforge dns set cloudflare
+devforge dns test
+devforge dns restore
+```
+
+`iran` is an unverified community profile. It can add Docker registry mirrors
+(`docker.arvancloud.ir`, `docker.iranserver.com`) to `/etc/docker/daemon.json`
+after a backup. It does not rewrite apt, dnf, npm, or PyPI. `mirror reset`
+clears the choice and restores `daemon.json` from `daemon.json.devforge.bak`
+when that backup exists.
+
+DNS presets: Cloudflare and Google are marked verified. Shecan, Electro,
+Begzar, and 403 are unverified community presets. A `10.x` address only works
+on networks that route to it. DevForge detects systemd-resolved,
+NetworkManager, resolvconf, or a static `resolv.conf`, backs up the file, and
+`dns restore` puts the backup back. If a link or connection name cannot be
+detected, the plan stops and tells you what to do by hand.
+
+## Safety
+
+- Plans show the exact command. Root steps are prefixed with `sudo --` and a
+  reason when you are not root.
+- Config edits keep the first `*.devforge.bak`.
+- Deletes are refused unless the path is inside a DevForge data, state,
+  config, or cache directory.
+- Version strings are checked before they are used in a path or a command.
+- Commands are argument lists. The program does not use a shell.
+- There is no telemetry.
+- Shell integration is a marked block in `.bashrc`, `.zshrc`, or fish
+  `config.fish`. `devforge shell remove` deletes that block and leaves the
+  rest of the file.
+
+Exit codes: `0` success, `1` a blocked plan, a failed step, or a declined
+confirmation, `2` incorrect usage.
+
+## Paths
+
+| Purpose | Location |
+| --- | --- |
+| Tools and shims | `~/.local/share/devforge` |
+| Logs | `~/.local/state/devforge/logs/devforge.log` |
+| Config | `~/.config/devforge/config.json` |
+| Cache | `~/.cache/devforge` |
+
+`XDG_DATA_HOME`, `XDG_STATE_HOME`, `XDG_CONFIG_HOME`, and `XDG_CACHE_HOME`
+override those defaults. Logs redact passwords, tokens, and URL credentials.
 
 ## Development
 
@@ -74,36 +255,5 @@ ruff check .
 mypy
 ```
 
-The runtime path uses only the Python standard library. Dev tools (ruff, mypy,
-pytest) live in the optional `dev` extra and are never needed to run DevForge.
-
-Layout:
-
-```
-devforge/
-  cli.py            argument parsing and dispatch
-  commands/         one module per subcommand
-  core/             detection, package managers, state, plan, net, mirrors, dns
-  tools/            one module per managed tool
-  data/             community-editable mirror and version data
-tests/
-docs/
-```
-
-## Safety model
-
-- Every mutating action is planned, displayed, and confirmed before it runs.
-- Configuration files are backed up before they are edited.
-- Deletions are refused unless the path is inside a DevForge-owned directory.
-- Mirrors and DNS changes are opt-in and always reversible.
-- Secrets are redacted from logs, which live in `~/.local/state/devforge/logs/`.
-
-## Contributing
-
-See `CONTRIBUTING.md`. The English specification in `.docs/AGENTS.md` is the
-source of truth for behavior.
-
-## License
-
-MIT. See `LICENSE`.
-
+The dev tools are never required to run DevForge. See `CONTRIBUTING.md` and
+`docs/architecture.md`.

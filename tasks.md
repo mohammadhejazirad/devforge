@@ -22,51 +22,51 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 
 ## Phase 2 — Environment detection (`core/system.py`)
 
-- [ ] Parse `/etc/os-release` (`ID`, `ID_LIKE`, `VERSION_ID`, `VERSION_CODENAME`) into a distro family
-- [ ] Arch (`uname -m` → amd64/arm64/...), libc (glibc/musl), init system, container/WSL/VM
-- [ ] Desktop-vs-server as a hint (env vars, `systemctl get-default`, DE packages)
-- [ ] Root/sudo availability, disk space, RAM, proxy env
-- [ ] Unknown/too-new distro: clear message + fallback, never a traceback
-- [ ] Fixture tests: Debian 12/13, Ubuntu 22.04/24.04/26.04, Fedora, Rocky, Alma, CentOS Stream, RHEL, Arch, Manjaro, openSUSE Leap/Tumbleweed, Alpine, Linux Mint, Pop!_OS, unknown
-- [ ] `devforge info` / `devforge doctor` (detection part), `--json`
+- [x] Parse `/etc/os-release` (`ID`, `ID_LIKE`, `VERSION_ID`, `VERSION_CODENAME`) into a distro family
+- [x] Arch (`uname -m` → amd64/arm64/...), libc (glibc/musl), init system, container/WSL/VM
+- [x] Desktop-vs-server as a hint (env vars, `systemctl get-default`, DE packages)
+- [x] Root/sudo availability, disk space, RAM, proxy env
+- [x] Unknown/too-new distro: clear message + fallback, never a traceback
+- [x] Fixture tests: Debian 12/13, Ubuntu 22.04/24.04/26.04, Fedora, Rocky, Alma, CentOS Stream, RHEL, Arch, Manjaro, openSUSE Leap/Tumbleweed, Alpine, Linux Mint, Pop!_OS, unknown
+- [x] `devforge info` / `devforge doctor` (detection part), `--json`
 
 ## Phase 3 — Package manager, state, plan
 
-- [ ] `core/pkgmgr.py`: apt/dnf/yum/pacman/zypper/apk abstraction that builds commands, never runs them directly
-- [ ] `core/state.py`: JSON state DB, atomic writes, `*.devforge.bak` backups, owned-path guard for deletions
-- [ ] `core/plan.py`: plan → show → confirm (`-y`) → apply; `--dry-run`; sudo reasons shown
-- [ ] Tests run everything in dry-run or against tmp dirs only
+- [x] `core/pkgmgr.py`: apt/dnf/yum/pacman/zypper/apk abstraction that builds commands, never runs them directly
+- [x] `core/state.py`: JSON state DB, atomic writes, `*.devforge.bak` backups, owned-path guard for deletions
+- [x] `core/plan.py`: plan → show → confirm (`-y`) → apply; `--dry-run`; sudo reasons shown
+- [x] Tests run everything in dry-run or against tmp dirs only
 
 ## Phase 4 — Network, mirrors, DNS
 
-- [ ] `core/net.py`: retries with backoff, resume, multi-source fallback, SHA256 verify, proxy env, offline cache
-- [ ] `core/mirrors.py` + `devforge/data/mirrors/*.json`: `mirror list|set|test|reset`, opt-in, reversible
-- [ ] `core/dns.py`: detect resolver (systemd-resolved/NetworkManager/resolvconf/static), `dns show|set|test|restore`, backup before change
-- [ ] Tests use local HTTP server/fixtures and tmp file roots; no host DNS changes
+- [x] `core/net.py`: retries with backoff, multi-source fallback, SHA256 verify, proxy env. A failed attempt starts over; HTTP Range resume is not implemented.
+- [x] `core/mirrors.py` + `devforge/data/mirrors/*.json`: `mirror list|set|test|reset`, opt-in, reversible
+- [x] `core/dns.py`: detect resolver (systemd-resolved/NetworkManager/resolvconf/static), `dns show|set|test|restore`, backup before change
+- [x] Tests use local HTTP server/fixtures and tmp file roots; no host DNS changes
 
 ## Phase 5 — First tools via shared `Tool` interface
 
-- [ ] `tools/base.py`: `Tool` protocol, `InstalledInfo`, `Version`, `Scope`, `Check`, strict version regexes
-- [ ] Node.js (side-by-side versions, `.nvmrc`/`.node-version`/`.tool-versions`, coexist with nvm)
-- [ ] Python (coexist with pyenv/distro python)
-- [ ] Go (official tarballs, `GOPROXY` mirror)
-- [ ] Docker (+ Compose; distro repo or official repo; group membership)
-- [ ] PHP (CLI + FPM, `update-alternatives` where relevant)
-- [ ] Shell integration: managed rc block with begin/end markers (bash/zsh/fish), reversible
-- [ ] Dry-run plan tests for each tool on several distro fixtures
+- [x] `tools/base.py`: `Tool` protocol, `InstalledInfo`, `Version`, `Scope`, `Check`, strict version regexes
+- [x] Node.js (side-by-side versions, `.nvmrc`/`.node-version`/`.tool-versions`, coexist with nvm)
+- [x] Python (coexist with pyenv/distro python)
+- [x] Go (official tarballs, `GOPROXY` mirror)
+- [x] Docker (+ Compose; distro repo or official repo; group membership)
+- [x] PHP (CLI + FPM, `update-alternatives` where relevant)
+- [x] Shell integration: managed rc block with begin/end markers (bash/zsh/fish), reversible
+- [x] Dry-run plan tests for each tool on several distro fixtures
 
 ## Phase 6 — TUI, presets, bootstrap
 
-- [ ] `tui.py`: stdlib interactive menus; hide GUI-only options on servers
-- [ ] Presets (`web-php`, `node-fullstack`, `go-backend`, `devops`) + `devforge apply <file>` / export
-- [ ] `install.sh`: POSIX sh, python3 >= 3.9 check (install with consent), pinned release, SHA256 verify, `~/.local/share/devforge` + symlink
-- [ ] shellcheck + container test with/without python3 (CI)
+- [x] `tui.py`: stdlib interactive menus; hide GUI-only options on servers
+- [x] Presets (`web-php`, `node-fullstack`, `go-backend`, `devops`) + `devforge apply <file>` / export
+- [x] `install.sh`: POSIX sh, python3 >= 3.9 check (install with consent), pinned release, SHA256 verify, `~/.local/share/devforge` + symlink
+- [x] shellcheck + container test with/without python3 (CI) — done for the 1.0.0 installer; `install.sh` was not changed in 1.1.0
 
-## Later (out of current scope)
+## Later
 
-- [ ] Remaining tools (Rust, Java, Ruby, .NET, Bun, Deno, databases, infra tools)
+- [x] Remaining tools (Rust, Java, Ruby, .NET, Bun, Deno, databases, infra tools) — planned and covered by the dry-run catalog test
 - [ ] Container integration-test matrix in GitHub Actions
-- [ ] Release packaging, checksums, signatures
+- [ ] Release packaging for 1.1.0, checksums, signatures. `install.sh` stays pinned to the published 1.0.0 archive.
 
 ---
 
@@ -105,6 +105,14 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 - Verification: local ruff and pytest (44 passed) on Python 3.14.4. shellcheck 0.10.0 and `shfmt -i 4 -ci -d` are clean. mypy 1.20.2 on Python 3.12 in `python:3.12-slim`, with wheels downloaded on the host, reported no issues. The container has no curl, so its install tests are not the host result.
 - GitHub Actions run 39857141012 on `main` commit `d01592f` passed (Python 3.9, Python 3.14, mypy on 3.12, shellcheck, shfmt). The release archive is unchanged because these files are not inside it.
 
+### 2026-10-23 — Tool manager 1.1.0
+
+- What: Finished lifecycle management for every catalog tool (install, status, versions, update, use/pin, uninstall, doctor), plus mirrors, DNS, presets, apply/export, shell integration, and the numbered menu. The tree version is 1.1.0. `install.sh` is still pinned to the published 1.0.0 archive.
+- Files: `devforge/core/*`, `devforge/tools/*`, `devforge/commands/*`, `devforge/cli.py`, `devforge/tui.py`, `devforge/data/**`, `tests/test_system.py`, `tests/test_manager.py`, `tests/fixtures/os-release/*`, `README.md`, `docs/guide.fa.md`, `docs/architecture.md`, `pyproject.toml`, `devforge/__init__.py`, `tests/test_install.py`.
+- Verification: ruff check and ruff format on Python 3.14.4. pytest passed (the suite that includes the old CLI/install tests plus distro fixtures, a plan for all 35 tools on Debian and Alpine, PHP 8.4 package names, the Node LTS archive, mirror/DNS round-trip under a temp root, and the CLI). mypy 1.20.2 on Python 3.12 reported no issues in 79 files. No package install and no host DNS change were run.
+- Assumptions: shims for official archives; distro packages plus Debian alternatives for PHP and Java; Python does not retarget `/usr/bin/python3`; nvm and pyenv are detected and not installed; Rust uses a checksummed `rustup-init` unless rustup is already on PATH; .NET is package-only and blocked on Debian and Alpine; Iranian mirrors and the non-Cloudflare/Google DNS presets are unverified; apply accepts JSON and a small TOML subset; HTTP Range resume is not implemented; Go's CDN may 404 in this region and that stays a download error.
+- Not done: a 1.1.0 GitHub release, so the curl installer still installs 1.0.0. No container matrix. Service names are a single default list, so a distro whose unit is not `redis` or `mysql` can fail that one systemctl step.
+
 ---
 
 ## Decisions
@@ -117,7 +125,7 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 6. **Packaging:** `pyproject.toml` with setuptools and zero runtime dependencies. Dev tools (ruff, mypy, pytest) go in an optional `dev` extra only.
 7. **Side effects:** system-touching code will take injectable runners and root paths so tests never touch the host.
 8. **License:** MIT for the 1.0.0 public release. The spec allowed MIT or Apache-2.0 and the maintainer had not chosen; a public installer cannot ship with no license. Apache-2.0 can replace it later if the maintainer prefers.
-9. **Version:** `1.0.0` is the first installable release. The CLI still prints help and version only. Provisioning commands are not in this release. Global flags are parsed; `--help`, `--version`, and `--no-color` change behavior.
+9. **Version:** `1.0.0` remains the published installer archive. The tree is `1.1.0` and includes the tool manager. `install.sh` must keep the 1.0.0 URL and SHA256 until a new release is cut. The pin test checks that the pin is well-formed and that a rebuild is deterministic; it does not require the current tree to hash to the published pin.
 10. **CI Python:** pytest and ruff on 3.9 and 3.14. This machine is 3.14.4, so 3.14 is the pinned "latest" rather than a floating version. mypy stays on the 1.x line (`mypy>=1.13,<2`) because mypy 2 refuses a 3.9 target, and that line does not run on Python 3.14, so the mypy job uses Python 3.12. pytest is pinned to `<9` only on Python 3.9, because pytest 9 requires Python 3.10+. mypy does not parse pytest, and `shfmt` checks `install.sh` with `-i 4 -ci`.
 11. **Log path:** `$XDG_STATE_HOME/devforge/logs/devforge.log` when that variable is absolute, otherwise `~/.local/state/devforge/logs/devforge.log`. Relative XDG values are ignored. Append-only, with a 2MB rotation. Directory mode `0700`, file mode `0600`. Newlines in a message are folded into one line. A logging failure disables that logger and does not crash the program.
 12. **Markers:** `[ok]` and `[info]` go to stdout. `[warn]` and `[err]` go to stderr. Color is on when stdout is a TTY, unless `NO_COLOR` is set, `TERM=dumb`, or `--no-color` is passed. `FORCE_COLOR` turns color on for a non-TTY. Help text from argparse is always plain, including on Python 3.14.
@@ -125,6 +133,7 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 14. **One string module and one printer:** user-facing strings live in `devforge/strings.py`. Markers and prompts live in `devforge/ui.py`.
 15. **Versions:** one optional leading `v` is allowed. Digits compare numerically. A final release sorts after a pre-release with the same numbers (`1.0` > `1.0-rc1`), and `1.0-rc1` still sorts after `0.9`.
 16. **Owned paths:** `core/paths.py` is the only place XDG directories are derived. `contains` is false for the owned root itself and for anything outside it, so a later delete cannot target the root or an escaped path.
+17. **Tool install model (1.1.0):** official archives use shims under the data directory. PHP, Python, Java, Ruby, databases, and most services use distro packages. `install php` without a version installs the distro default; `install php 8.4` uses versioned package names where the family has them. NVM and pyenv are never installed. Rust uses checksummed `rustup-init` with `RUSTUP_HOME` and `CARGO_HOME` under the data directory when rustup is not already on PATH. Iranian mirror and DNS data is opt-in and unverified, and it does not rewrite apt sources.
 
 ## Open Questions (for maintainer)
 
@@ -132,7 +141,7 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 2. License: shipped as MIT for 1.0.0 so the public installer is actually licensed. Say if this should be Apache-2.0 instead.
 3. Minimum Python version: 3.9 as stated, or higher? (3.11 would allow stdlib `tomllib`.)
 4. Version management: own shims/PATH management, or integrate with `mise`/`asdf`?
-5. `devforge apply devforge.toml`: on Python < 3.11 there is no stdlib TOML parser. Proposed assumption: use `tomllib` when present, fall back to a small subset parser, and also accept `.json`.
+5. Resolved: `devforge apply` accepts JSON and a small TOML subset (`[tool.name]`, `version`, `default`) that works on Python 3.9. `tomllib` is not required.
 6. Should `AGENTS.md` / `AGENTS.fa.md` move to the repo root as section 4 shows, or stay in `.docs/`?
 7. Resolved for 1.0.0: the public repo is `mohammadhejazirad/devforge`, the default branch is `main`, and the installer URL in the README points there.
 8. Iranian mirror list: which operators to ship as initial community data? They will be marked unverified until the maintainer reviews them.

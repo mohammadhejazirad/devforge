@@ -1,0 +1,5 @@
+{
+  "name": "web-php",
+  "summary": "PHP, Composer, Node.js, Nginx, and Git",
+  "tools": ["php", "composer", "node", "nginx", "git", "curl"]
+}
