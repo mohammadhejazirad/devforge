@@ -62,6 +62,7 @@ def test_dumb_terminal_disables_color(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_force_color_overrides_a_non_tty(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("NO_COLOR", raising=False)
     monkeypatch.setenv("FORCE_COLOR", "1")
+    monkeypatch.setenv("TERM", "xterm")
     stream = io.StringIO()
     printer = Printer.create(out=stream, err=stream)
     printer.ok("ready")

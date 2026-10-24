@@ -4,7 +4,7 @@ DevForge installs, updates, switches, pins, and removes development tools on
 Linux. It detects the machine, shows a plan, and changes the system only after
 you confirm. The same commands work on a desktop and on a server.
 
-This tree is **version 1.2.0**. It manages languages, package tools,
+This tree is **version 1.3.0**. It manages languages, package tools,
 infrastructure, databases, and everyday utilities. A Persian walkthrough is in
 [docs/guide.fa.md](docs/guide.fa.md).
 
@@ -18,7 +18,7 @@ infrastructure, databases, and everyday utilities. A Persian walkthrough is in
 
 ## Install
 
-### From a checkout (version 1.2.0)
+### From a checkout (version 1.3.0)
 
 ```bash
 git clone https://github.com/mohammadhejazirad/devforge.git
@@ -33,21 +33,27 @@ python3 -m pip install --user -e .
 devforge --version
 ```
 
-That prints `devforge 1.2.0` from this tree.
+That prints `devforge 1.3.0` from this tree.
 
-### Published installer (release 1.2.0)
+### Published installer (release 1.3.0)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
 ```
 
-`install.sh` downloads `devforge-1.2.0.tar.gz` from the GitHub release, checks
+`install.sh` downloads `devforge-1.3.0.tar.gz` from the GitHub release, checks
 the SHA256 pinned in the script, and installs into `~/.local` (or `/usr/local`
-when run as root). It does not run any other remote script. Running it again
+when run as root). It does not run any other remote script. Python is installed through the system package manager after approval when needed;
+the installer can download, hash, and extract using Python without curl, wget,
+sha256sum, or tar already installed (after the script itself has been obtained).
+Running it again
 replaces the program and leaves `tools/`, `shims/`, and `env.sh` in place.
 
 If you still have the old 1.0.0 command, run `install.sh` once more. That
 release cannot update itself. From 1.1.0 on, use `devforge self-update`.
+
+Release 1.3.0 separates current-line updates from explicit version changes and
+fixes Node archive extraction and runtime dependencies. See [CHANGELOG.md](CHANGELOG.md).
 
 ## What you can manage
 
@@ -71,8 +77,8 @@ Two kinds of install:
 - **Distro packages** (PHP, Python, Java, Ruby, databases, Nginx, Docker, and
   the utilities) use apt, dnf, yum, pacman, zypper, or apk. `install php`
   installs the distro default. `install php 8.4` asks for the versioned
-  packages on Debian (`php8.4-cli`) and Alpine (`php83`). Other families get
-  the single distro package and a note when the requested version may differ.
+  packages on Debian (`php8.4-cli`) and Alpine (`php84`). A family without versioned packages refuses an explicit version it cannot select.
+  Packages must exist in the configured repositories; DevForge does not add PHP repositories.
 
 DevForge does not replace `/usr/bin/python3`. A Python shim selects
 `python3.13` and leaves the system `python3` alone. PHP and Java alternatives
@@ -82,8 +88,9 @@ and then selected. An alternative that is already registered is selected
 without being registered again.
 
 NVM and pyenv are detected and left alone. DevForge will not run their remote
-installers. npm is the npm that ships with Node: `devforge update npm` runs
-`npm install -g npm@latest`. Rust is installed with the official `rustup-init`
+installers. npm is the npm that ships with Node: `devforge install npm` installs Node automatically when it is missing.
+`devforge update npm` updates within the installed npm major release.
+Composer installs PHP automatically when missing; Yarn installs Node. Rust is installed with the official `rustup-init`
 binary after a checksum check, into the DevForge data directory, unless you
 already have rustup. .NET is installed from distro packages only. On Debian
 and Alpine, where the SDK is not in the default repositories, the plan is
@@ -119,9 +126,11 @@ devforge self-update
 `status php` prints the installed version, where it came from (`system` or
 `devforge`), the newest version DevForge knows, and whether you can install,
 update, switch, or uninstall it. A missing tool is reported as not installed.
-`update php` installs it when it is missing, upgrades the distro package when
-a newer candidate exists, and prints "already up to date" when nothing newer
-is known. `update` with no name requires `--all`, and `--all` only touches
+`update php` installs it when missing. Otherwise it refreshes the package indexes
+and upgrades the installed PHP line, including distro security revisions. It
+checks candidates after refreshing and refuses a different release line. The
+newest available package depends on the configured distro repositories; it may
+lag the newest release on php.net. `update` with no name requires `--all`, and `--all` only touches
 tools that are already installed.
 
 `use` defaults to a user-wide default. `--project` and `pin` write the tool's
@@ -174,7 +183,7 @@ update, switch, pin, or remove that tool. Pick a letter for this computer,
 doctor, presets, mirrors, DNS, shell setup, or a DevForge update.
 
 ```text
-DevForge 1.2.0
+DevForge 1.3.0
   Ubuntu 24.04 (debian) | apt
 
 Tools  (enter a number)
@@ -207,8 +216,16 @@ builds that were current on 2026-10-23, including Node 26.12.1, 24.22.1,
 22.23.4, and 20.20.2; Go 1.27.3 and 1.26.10; PHP 8.5, 8.4, 8.3, and 8.2;
 Python 3.14, 3.13, 3.12, and 3.11; Java 25, 21, and 17.
 
-`install node` selects the LTS line (24.22.1). `update node` moves to the
-newest known version when that version is newer than the one you have.
+`install node` selects the current LTS release. Online installs with no version
+or a partial version, and online archive updates, refresh the upstream index
+when one is configured. Dry runs use known data and do not refresh it.
+`update node` selects the newest stable release in the installed major line.
+For example, Node 22 stays on 22; `install node 24` explicitly changes the line.
+PHP, Python, and Go retain major.minor; other indexed archive tools retain major.
+A refresh failure blocks the operation instead of claiming the tool is up to date.
+Indexes that expose only the latest release cannot discover older-line patches;
+these updates stop when no matching release is known.
+`status` separates `update_target` from `new_release_available` in JSON.
 `install node 26.12.1` selects that version and keeps the others. A download without a pinned checksum fetches
 the publisher's checksum file at apply time. Dry-run shows that. DevForge will
 not install an archive it cannot hash.

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from devforge.core.net import Fetcher
 from devforge.core.versioning import is_valid_version, sort_versions
 
 _NAME = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")
@@ -131,7 +132,37 @@ def save_index(cache: Path, index: VersionIndex) -> None:
         "sha256": index.sha256,
         "refresh": {"format": index.refresh_format, "url": index.refresh_url},
     }
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    import os
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as handle:
+        temporary = Path(handle.name)
+        try:
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+            handle.close()
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+def refresh_index(index: VersionIndex, fetcher: Fetcher) -> VersionIndex:
+    """Fetch authoritative releases while retaining checksums for older builds."""
+    payload = fetcher.get(index.refresh_url, timeout=20)
+    versions, lts, latest, checksums = parse_refresh(index.refresh_format, payload)
+    if not versions:
+        raise CatalogError(f"Upstream returned no usable versions for {index.tool}.")
+    merged = {version: dict(arches) for version, arches in index.sha256.items()}
+    for version, arches in checksums.items():
+        merged.setdefault(version, {}).update(arches)
+    return VersionIndex(
+        index.tool,
+        tuple(sort_versions(versions)),
+        lts,
+        latest,
+        merged,
+        index.refresh_format,
+        index.refresh_url,
+    )
 
 
 def parse_refresh(
@@ -267,22 +298,24 @@ def _index(path: Path, name: str) -> VersionIndex:
 def _node_index(data: object) -> tuple[list[str], str, str, dict[str, dict[str, str]]]:
     if not isinstance(data, list):
         raise CatalogError("Node index was not a list")
-    versions: list[str] = []
-    lts = ""
-    latest = ""
+    stable: list[str] = []
+    lts_versions: list[str] = []
     for item in data:
         if not isinstance(item, dict):
             continue
-        raw = str(item.get("version", ""))
-        version = raw[1:] if raw.startswith("v") else raw
-        if not is_valid_version(version):
+        version = str(item.get("version", "")).removeprefix("v")
+        if not is_valid_version(version) or not re.fullmatch(r"\d+(?:\.\d+)*", version):
             continue
-        versions.append(version)
-        if not latest:
-            latest = version
-        if not lts and item.get("lts") not in (False, None, ""):
-            lts = version
-    return versions, lts, latest, {}
+        stable.append(version)
+        if item.get("lts") not in (False, None, ""):
+            lts_versions.append(version)
+    ordered = sort_versions(stable)
+    return (
+        ordered,
+        sort_versions(lts_versions)[0] if lts_versions else "",
+        ordered[0] if ordered else "",
+        {},
+    )
 
 
 def _go_index(data: object) -> tuple[list[str], str, str, dict[str, dict[str, str]]]:

@@ -25,7 +25,7 @@ def is_valid_version(value: object) -> bool:
     """Return True when ``value`` is a safe, well-formed version string."""
     if not isinstance(value, str):
         return False
-    return bool(_VERSION_RE.match(value))
+    return bool(_VERSION_RE.fullmatch(value))
 
 
 def require_version(value: str, field: str = "version") -> str:
@@ -91,7 +91,7 @@ class Version:
 
     @property
     def major(self) -> int:
-        match = re.match(r"^(\d+)", self.value)
+        match = re.match(r"^v?(\d+)", self.value)
         return int(match.group(1)) if match else 0
 
     @property
@@ -106,3 +106,22 @@ def sort_versions(values: Iterable[str], *, reverse: bool = True) -> list[str]:
     """Sort version strings newest-first (or oldest-first) by semantic order."""
     versions = [Version(item) for item in values if is_valid_version(item)]
     return [item.value for item in sorted(versions, reverse=reverse)]
+
+
+def release_line(tool: str, version: str) -> str:
+    """Compatibility line retained by update; install explicitly changes it."""
+    parsed = Version(version)
+    if tool in {"php", "python", "go"}:
+        return parsed.major_minor
+    return str(parsed.major)
+
+
+def newest_in_line(tool: str, current: str, versions: Iterable[str]) -> str:
+    """Choose a stable release in the active compatibility line."""
+    line = release_line(tool, current)
+    candidates = [
+        item
+        for item in versions
+        if re.fullmatch(r"v?\d+(?:\.\d+)*", item) and release_line(tool, item) == line
+    ]
+    return max(candidates, key=Version) if candidates else ""

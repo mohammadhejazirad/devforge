@@ -27,13 +27,15 @@ def rc_targets(home: Path, shell_name: str) -> list[tuple[str, Path]]:
     for kind, path in candidates:
         if path.is_file():
             selected.append((kind, path))
-    if selected:
-        return selected
     if "fish" in shell_name:
-        return [("fish", home / ".config" / "fish" / "config.fish")]
-    if "zsh" in shell_name:
-        return [("sh", home / ".zshrc")]
-    return [("sh", home / ".bashrc")]
+        current = ("fish", home / ".config" / "fish" / "config.fish")
+    elif "zsh" in shell_name:
+        current = ("sh", home / ".zshrc")
+    else:
+        current = ("sh", home / ".bashrc")
+    if current not in selected:
+        selected.append(current)
+    return selected
 
 
 def render_block(kind: str, shims: Path) -> str:
@@ -169,12 +171,49 @@ fi
 if [ -z "$ver" ] && [ -f "$ROOT/default" ]; then
     ver=$(tr -d '[:space:]' < "$ROOT/default")
 fi
+# An unversioned distro install has no selected version yet. Find its system
+# executable with this shim directory removed to avoid recursively calling it.
+if [ -z "$ver" ]; then
+    shim_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+    old_ifs=$IFS
+    IFS=:
+    clean_path=""
+    for entry in $PATH; do
+        if [ "$entry" != "$shim_dir" ]; then
+            clean_path="${{clean_path:+$clean_path:}}$entry"
+        fi
+    done
+    IFS=$old_ifs
+    PATH=$clean_path
+    export PATH
+    if command -v {sh_single(binary)} >/dev/null 2>&1; then
+        exec {sh_single(binary)} "$@"
+    fi
+fi
 case "$ver" in
     "" | *[!0-9A-Za-z._+-]* | [-]*)
         echo "devforge: no valid {binary} version is selected" >&2
         exit 1
         ;;
 esac
+case "$ver" in
+    [0-9]* | v[0-9]*) ;;
+    *)
+        echo "devforge: no valid {binary} version is selected" >&2
+        exit 1
+        ;;
+esac
+# Project and shell pins may select a major or major.minor prefix.
+if [ ! -d "$ROOT/$ver" ]; then
+    resolved=$(for candidate in "$ROOT/$ver".*; do
+        if [ -f "$candidate/.devforge-complete" ]; then
+            basename "$candidate"
+        fi
+    done | sort -V | tail -n 1)
+    if [ -n "$resolved" ]; then
+        ver=$resolved
+    fi
+fi
 mm=$(printf '%s\\n' "$ver" | cut -d. -f1,2)
 compact=$(printf '%s\\n' "$mm" | tr -d '.')
 major=$(printf '%s\\n' "$ver" | cut -d. -f1)

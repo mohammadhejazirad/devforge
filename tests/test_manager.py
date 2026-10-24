@@ -253,11 +253,11 @@ def test_status_reports_an_installed_php(tmp_path: Path) -> None:
     assert row["installed_version"] == "8.3.6"
     assert row["source"] == "system"
     assert row["latest"] == "8.5"
-    assert row["update_available"] is True
+    assert row["update_available"] is None
     assert row["can_update"] is True
 
 
-def test_update_php_installs_the_newer_line(tmp_path: Path) -> None:
+def test_update_php_preserves_the_installed_line(tmp_path: Path) -> None:
     ctx, out, _err = machine(tmp_path, "debian-12", family="debian")
     from devforge.core.runner import ScriptedRunner
 
@@ -267,7 +267,8 @@ def test_update_php_installs_the_newer_line(tmp_path: Path) -> None:
     runner.when_argv(["/usr/bin/php", "-v"], stdout="PHP 8.3.6 (cli)\n")
     code = cmd_update(ctx, "php", all_tools_flag=False)
     assert code == 0
-    assert "php8.5-cli" in out.getvalue()
+    assert "php8.3-cli" in out.getvalue()
+    assert "php8.5-cli" not in out.getvalue()
 
 
 def test_use_shell_does_not_write(tmp_path: Path) -> None:

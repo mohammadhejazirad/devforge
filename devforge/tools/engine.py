@@ -13,6 +13,7 @@ from devforge.context import Context
 from devforge.core.mirrors import MirrorProfile, env_assignments, require_profile, rewrite_urls
 from devforge.core.pkgmgr import (
     PackageManagerError,
+    comparable,
     install,
     lookup_versions,
     refresh,
@@ -22,9 +23,22 @@ from devforge.core.pkgmgr import (
 from devforge.core.plan import PIN_NAMES, Plan, Step
 from devforge.core.shell import rc_targets, render_block, render_env, render_shim, upsert_block
 from devforge.core.state import load_json
-from devforge.core.versioning import Version, is_valid_version, require_version
+from devforge.core.versioning import (
+    Version,
+    is_valid_version,
+    newest_in_line,
+    release_line,
+    require_version,
+)
 from devforge.tools.base import Check, InstalledInfo, Scope, ToolStatus
-from devforge.tools.catalog import ToolSpec, VersionIndex, load_index
+from devforge.tools.catalog import (
+    ToolSpec,
+    VersionIndex,
+    load_catalog,
+    load_index,
+    refresh_index,
+    save_index,
+)
 
 _SERVICE = re.compile(r"^[a-zA-Z0-9_-]{1,40}$")
 
@@ -75,22 +89,26 @@ def status_of(spec: ToolSpec, ctx: Context) -> ToolStatus:
     latest = _known_newest(index) or None
     kind = "none"
     available: bool | None = False
+    target: str | None = None
     if spec.strategy == "external":
         available = False
         kind = "none"
     elif spec.strategy == "package":
         available, kind = _package_update(spec, ctx, info)
-        newer = bool(
-            latest
-            and info.current
-            and is_valid_version(info.current)
-            and Version(latest) > Version(info.current)
-        )
-        if newer and ctx.system().family in spec.versioned_packages:
-            available = True
-            kind = "package"
+        packages = _choose_packages(spec, ctx.system().family, info.current, fallback=False)
+        if info.current and packages:
+            _, target = lookup_versions(ctx.system().package_manager, packages[0], ctx.runner)
+            parsed = comparable(target)
+            if (
+                spec.category == "runtime"
+                and parsed
+                and (release_line(spec.name, parsed) != release_line(spec.name, info.current))
+            ):
+                target = None
+                available = None
     elif info.current and latest and is_valid_version(info.current):
-        available = Version(latest) > Version(info.current)
+        target = newest_in_line(spec.name, info.current, (index.latest, *index.versions))
+        available = Version(target) > Version(info.current) if target else None
         kind = spec.strategy if available else "none"
     elif info.current is None and latest:
         available = False
@@ -117,6 +135,13 @@ def status_of(spec: ToolSpec, ctx: Context) -> ToolStatus:
         can_update=can_update,
         can_switch=can_switch,
         can_uninstall=can_uninstall,
+        update_target=target or None,
+        new_release_available=bool(
+            latest
+            and info.current
+            and Version(release_line(spec.name, latest))
+            > Version(release_line(spec.name, info.current))
+        ),
     )
 
 
@@ -139,7 +164,15 @@ def install_tool(
         return _install_rustup(spec, ctx, version, make_default=make_default)
     if spec.strategy == "package" or use_package:
         return _install_package(spec, ctx, version, make_default=make_default, fallback=use_package)
-    return _install_archive(spec, ctx, version, make_default=make_default)
+    plan = _install_archive(spec, ctx, version, make_default=make_default)
+    dependency = {"composer": "php", "yarn": "node"}.get(spec.name)
+    if dependency and not plan.blocked:
+        runtime = load_catalog(ctx.data_root)[dependency]
+        info = detect(runtime, ctx)
+        if info.current is None:
+            prerequisite = install_tool(runtime, ctx, None, make_default=True, use_package=False)
+            return merge_plans(plan.title, [prerequisite, plan])
+    return plan
 
 
 def update_tool(spec: ToolSpec, ctx: Context) -> Plan:
@@ -152,30 +185,54 @@ def update_tool(spec: ToolSpec, ctx: Context) -> Plan:
     if info.current is None and not info.versions:
         return install_tool(spec, ctx, None, make_default=True, use_package=False)
     if spec.strategy == "package":
-        newest = _known_newest(_index(spec, ctx))
-        family = ctx.system().family
-        moved = bool(
-            newest
-            and info.current
-            and is_valid_version(info.current)
-            and Version(newest) > Version(info.current)
-            and family in spec.versioned_packages
-        )
-        if moved:
-            return install_tool(spec, ctx, newest, make_default=True, use_package=False)
         return _upgrade_package(spec, ctx, info)
+    current = info.current or _default_version(spec, ctx)
+    if not current:
+        return Plan(title=spec.name, blocked="Select an installed version before updating.")
     if spec.strategy == "rustup":
-        return _install_rustup(spec, ctx, _index(spec, ctx).preferred() or None, make_default=True)
-    latest = _known_newest(_index(spec, ctx))
+        located = ctx.runner.which("rustup")
+        if not located:
+            return Plan(
+                title="rust", blocked="Rust is present without rustup; its owner must update it."
+            )
+        env = _rust_env(ctx) if _is_ours(located, ctx) else ()
+        process_env = dict(ctx.env)
+        process_env.update(dict(env))
+        result = ctx.runner.run((located, "show", "active-toolchain"), env=process_env, timeout=20)
+        if result.code != 0 or not result.stdout.startswith("stable-"):
+            return Plan(
+                title="rust",
+                blocked=(
+                    "The active Rust toolchain is pinned or not stable. "
+                    "Select a version explicitly."
+                ),
+            )
+        return Plan(
+            title="Update the stable Rust channel",
+            steps=[
+                Step(
+                    title="Update Rust stable",
+                    kind="command",
+                    argv=(located, "update", "stable"),
+                    env=env,
+                )
+            ],
+        )
+    try:
+        index = _release_index(spec, ctx)
+    except (ValueError, OSError, RuntimeError) as exc:
+        return Plan(title=spec.name, blocked=f"Could not refresh {spec.name}: {exc}")
+    latest = newest_in_line(spec.name, current, (index.latest, *index.versions))
     if not latest:
-        return Plan(title=spec.name, blocked=f"No version index is available for {spec.name}.")
-    current_known = bool(info.current and is_valid_version(info.current))
-    not_newer = current_known and not (Version(latest) > Version(str(info.current)))
-    if not_newer:
         return Plan(
             title=spec.name,
-            empty_message=f"{spec.name} {info.current} is already up to date.",
+            blocked=(
+                f"No stable release is known for {spec.name} {release_line(spec.name, current)}. "
+                "Use install to explicitly select another release line."
+            ),
         )
+    if Version(latest) <= Version(current):
+        return Plan(title=spec.name, empty_message=f"{spec.name} {current} is already up to date.")
     return install_tool(spec, ctx, latest, make_default=True, use_package=False)
 
 
@@ -184,6 +241,18 @@ def use_tool(spec: ToolSpec, ctx: Context, version: str, scope: Scope) -> Plan:
     if spec.strategy == "external":
         return Plan(title=spec.name, blocked=spec.notes)
     require_version(version)
+    if spec.strategy == "archive" and scope is Scope.GLOBAL:
+        installed = _managed_versions(spec, ctx)
+        matches = [item for item in installed if _matches(item, version.lstrip("v"))]
+        if not matches:
+            return Plan(
+                title=spec.name,
+                blocked=(
+                    f"{spec.name} {version} is not installed. "
+                    f"Run install {spec.name} {version} first."
+                ),
+            )
+        version = max(matches, key=Version)
     if scope is Scope.SHELL:
         env_name = re.sub(r"[^A-Z0-9]", "_", spec.name.upper())
         plan = Plan(title=f"Select {spec.name} {version} for this shell")
@@ -384,6 +453,18 @@ def _install_package(
         detail = spec.notes or f"{spec.name} has no distro package for the {system.family} family."
         return Plan(title=spec.name, blocked=detail)
     info = detect(spec, ctx)
+    if (
+        version
+        and system.family not in spec.versioned_packages
+        and not (info.current and _matches(info.current, version))
+    ):
+        return Plan(
+            title=spec.name,
+            blocked=(
+                f"This distro cannot select {spec.name} {version} with its package names. "
+                "The requested version will not be substituted with the distro default."
+            ),
+        )
     if _satisfied(spec, info, version, system.family):
         plan = Plan(
             title=spec.name, empty_message=f"{spec.name} is already installed ({info.current})."
@@ -440,7 +521,20 @@ def _install_archive(
     if archive is None:
         return _install_package(spec, ctx, version, make_default=make_default, fallback=True)
     system = ctx.system()
-    chosen = version or _index(spec, ctx).preferred()
+    index = _index(spec, ctx)
+    if version is None or re.fullmatch(r"v?\d+(?:\.\d+)?", version):
+        try:
+            index = _release_index(spec, ctx)
+        except (ValueError, OSError, RuntimeError) as exc:
+            return Plan(title=spec.name, blocked=f"Could not refresh {spec.name}: {exc}")
+    chosen = version or index.preferred()
+    if version and re.fullmatch(r"v?\d+(?:\.\d+)?", version):
+        matches = [item for item in index.versions if _matches(item, version.lstrip("v"))]
+        if not matches:
+            return Plan(
+                title=spec.name, blocked=f"No published {spec.name} version matches {version}."
+            )
+        chosen = max(matches, key=Version)
     if not chosen:
         return Plan(title=spec.name, blocked=f"No version is published for {spec.name}.")
     require_version(chosen)
@@ -472,7 +566,7 @@ def _install_archive(
         if "{arch}" not in archive.url and not archive.arch_map
         else _sha_key(system.arch, system.libc)
     )
-    digest = _index(spec, ctx).checksum(chosen, sha_key)
+    digest = index.checksum(chosen, sha_key)
     checksum_url = ""
     if not digest and archive.checksum_url:
         checksum_url = archive.checksum_url.format(version=chosen, arch=token)
@@ -531,6 +625,14 @@ def _install_archive(
         )
     plan.add(
         Step(
+            title="Verify the installed executable layout",
+            kind="verify-install",
+            path=str(version_dir),
+            packages=(archive.filename if spec.shim_kind == "phar" else spec.binaries[0],),
+        )
+    )
+    plan.add(
+        Step(
             title="Record a completed install",
             kind="write",
             path=str(version_dir / ".devforge-complete"),
@@ -555,38 +657,40 @@ def _install_archive(
 
 
 def _install_npm(spec: ToolSpec, ctx: Context, version: str | None) -> Plan:
-    del version
-    if ctx.runner.which("npm"):
-        info = detect(spec, ctx)
-        return Plan(
-            title="npm", empty_message=f"npm is already installed ({info.current or 'unknown'})."
-        )
-    if ctx.runner.which("node"):
-        return Plan(
-            title="npm",
-            blocked="Node is installed but npm was not found. Reinstall that Node version.",
-        )
-    plan = Plan(
-        title="npm", blocked="npm is installed as part of Node. Run `devforge install node` first."
+    if not ctx.runner.which("npm"):
+        if ctx.runner.which("node"):
+            return Plan(title="npm", blocked="Node is present without npm. Reinstall Node first.")
+        node = load_catalog(ctx.data_root)["node"]
+        plan = install_tool(node, ctx, None, make_default=True, use_package=False)
+        if version and not plan.blocked:
+            plan.add(_npm_step(ctx, version))
+        return plan
+    if version:
+        return Plan(title=f"Install npm {version}", steps=[_npm_step(ctx, version)])
+    info = detect(spec, ctx)
+    return Plan(
+        title="npm", empty_message=f"npm is already installed ({info.current or 'unknown'})."
     )
-    return plan
+
+
+def _npm_step(ctx: Context, selector: str) -> Step:
+    return Step(
+        title=f"Install npm {selector}",
+        kind="command",
+        argv=("npm", "install", "-g", f"npm@{selector}"),
+        env=(("PATH", str(ctx.paths.shims) + ":" + ctx.env.get("PATH", "/usr/bin:/bin")),),
+    )
 
 
 def _update_npm(spec: ToolSpec, ctx: Context, info: InstalledInfo) -> Plan:
-    del spec
     if not ctx.runner.which("npm"):
-        return Plan(title="npm", blocked="npm is not installed. Run `devforge install node` first.")
-    plan = Plan(title="Update npm")
-    plan.add(
-        Step(
-            title="Update the global npm that ships with Node",
-            kind="command",
-            argv=("npm", "install", "-g", "npm@latest"),
-        )
+        return _install_npm(spec, ctx, None)
+    if not info.current:
+        return Plan(title="npm", blocked="Cannot determine the installed npm release line.")
+    return Plan(
+        title="Update npm within its current major release",
+        steps=[_npm_step(ctx, f"^{Version(info.current).major}")],
     )
-    if info.current:
-        plan.notes.append(f"The current npm is {info.current}.")
-    return plan
 
 
 def _install_rustup(
@@ -665,7 +769,7 @@ def _install_rustup(
                 title=f"Shim {binary}",
                 kind="write",
                 path=str(ctx.paths.shims / binary),
-                content=_cargo_shim(cargo / "bin" / binary),
+                content=_cargo_shim(cargo / "bin" / binary, _rust_env(ctx)),
                 policy="owned",
                 fmt="executable",
             )
@@ -682,11 +786,6 @@ def _upgrade_package(spec: ToolSpec, ctx: Context, info: InstalledInfo) -> Plan:
     packages = _choose_packages(spec, system.family, info.current, fallback=False)
     if not packages or not system.package_manager:
         return Plan(title=spec.name, blocked=f"Cannot upgrade {spec.name} on this system.")
-    available, _kind = _package_update(spec, ctx, info)
-    if available is False:
-        return Plan(
-            title=spec.name, empty_message=f"{spec.name} {info.current} is already up to date."
-        )
     try:
         argv = tuple(upgrade(system.package_manager, packages))
     except PackageManagerError as exc:
@@ -694,13 +793,27 @@ def _upgrade_package(spec: ToolSpec, ctx: Context, info: InstalledInfo) -> Plan:
     plan = Plan(title=f"Update {spec.name}")
     plan.add(
         Step(
-            title="Upgrade " + " ".join(packages),
+            title="Refresh package indexes",
             kind="command",
+            argv=tuple(refresh(system.package_manager)),
+            sudo=True,
+            reason="Updates require current package indexes.",
+        )
+    )
+    plan.add(
+        Step(
+            title="Upgrade " + " ".join(packages),
+            kind="package-upgrade",
             argv=argv,
             sudo=True,
             reason=f"Upgrading {spec.name} uses the system package manager.",
+            tool=spec.name,
+            version=info.current or "",
+            manager=system.package_manager,
+            packages=packages,
         )
     )
+    plan.notes.append("Uses the latest package published by the configured distro repositories.")
     return plan
 
 
@@ -791,9 +904,7 @@ def _satisfied(spec: ToolSpec, info: InstalledInfo, version: str | None, family:
         return False
     if version is None:
         return True
-    if _matches(info.current, version):
-        return True
-    return spec.strategy == "package" and family not in spec.versioned_packages
+    return _matches(info.current, version)
 
 
 def _matches(current: str, requested: str) -> bool:
@@ -808,9 +919,16 @@ def _package_update(spec: ToolSpec, ctx: Context, info: InstalledInfo) -> tuple[
     installed, candidate = lookup_versions(system.package_manager, packages[0], ctx.runner)
     if not installed or not candidate:
         return None, "unknown"
-    if not is_valid_version(installed) or not is_valid_version(candidate):
-        return None, "unknown"
-    return Version(candidate) > Version(installed), "package"
+    if installed == candidate:
+        return False, "package"
+    if system.package_manager == "apt":
+        result = ctx.runner.run(
+            ("dpkg", "--compare-versions", candidate, "gt", installed), timeout=20
+        )
+        if result.code not in {0, 1}:
+            return None, "unknown"
+        return result.code == 0, "package"
+    return True, "package"
 
 
 def _add_default(plan: Plan, spec: ToolSpec, ctx: Context, version: str) -> None:
@@ -953,7 +1071,12 @@ def _managed_versions(spec: ToolSpec, ctx: Context) -> list[str]:
         return []
     found: list[str] = []
     for child in root.iterdir():
-        if child.is_dir() and is_valid_version(child.name):
+        if (
+            child.is_dir()
+            and not child.is_symlink()
+            and is_valid_version(child.name)
+            and (child / ".devforge-complete").is_file()
+        ):
             found.append(child.name)
     ordered = sorted((Version(item) for item in found), reverse=True)
     return [item.value for item in ordered]
@@ -979,7 +1102,10 @@ def _coexist_notes(spec: ToolSpec, ctx: Context) -> list[str]:
 
 
 def _is_ours(path: str, ctx: Context) -> bool:
-    return str(ctx.paths.data) in path or str(ctx.paths.shims) in path
+    # Use the invocation path rather than resolving a shim's target: it is
+    # the shim directory that establishes DevForge ownership.
+    candidate = Path(path).absolute()
+    return any(root.absolute() in candidate.parents for root in (ctx.paths.data, ctx.paths.shims))
 
 
 def _known_newest(index: VersionIndex) -> str:
@@ -1028,9 +1154,27 @@ def _expand(template: str, version: str, arch: str) -> str:
     )
 
 
-def _cargo_shim(binary: Path) -> str:
-    return f'#!/bin/sh\nset -eu\nexec {_sh(str(binary))} "$@"\n'
+def _rust_env(ctx: Context) -> tuple[tuple[str, str], ...]:
+    return (
+        ("RUSTUP_HOME", str(ctx.paths.install_root / "rust" / "rustup")),
+        ("CARGO_HOME", str(ctx.paths.install_root / "rust" / "cargo")),
+    )
+
+
+def _cargo_shim(binary: Path, env: tuple[tuple[str, str], ...] = ()) -> str:
+    exports = "".join(f"export {key}={_sh(value)}\n" for key, value in env)
+    return f'#!/bin/sh\nset -eu\n{exports}exec {_sh(str(binary))} "$@"\n'
 
 
 def _sh(value: str) -> str:
     return "'" + value.replace("'", "'\\''") + "'"
+
+
+def _release_index(spec: ToolSpec, ctx: Context) -> VersionIndex:
+    """Refresh for lifecycle operations; dry runs use known data without cache writes."""
+    index = _index(spec, ctx)
+    if ctx.offline or ctx.dry_run or not index.refresh_url:
+        return index
+    updated = refresh_index(index, ctx.fetcher)
+    save_index(ctx.paths.cache, updated)
+    return updated

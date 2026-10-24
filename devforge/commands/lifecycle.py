@@ -70,14 +70,13 @@ def cmd_update(ctx: Context, name: str | None, *, all_tools_flag: bool) -> int:
         plans.append(plan)
     if not plans:
         if skipped:
-            for line in skipped:
-                ctx.printer.warn(line)
-            return 0
+            return run_plan(ctx, Plan(title="Update installed tools", blocked="; ".join(skipped)))
         ctx.printer.ok("No installed tools to update.")
         return 0
     merged = merge_plans("Update installed tools", plans)
     merged.notes.extend(skipped)
-    return run_plan(ctx, merged)
+    result = run_plan(ctx, merged)
+    return result if result else int(bool(skipped))
 
 
 def cmd_use(ctx: Context, name: str, version: str, *, scope: Scope) -> int:

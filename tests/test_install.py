@@ -17,7 +17,7 @@ from devforge import __version__
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "install.sh"
-RELEASE = "1.2.0"
+RELEASE = "1.3.0"
 
 
 def _pinned_sha() -> str:
@@ -27,8 +27,8 @@ def _pinned_sha() -> str:
     raise AssertionError("install.sh is missing DEFAULT_SHA256")
 
 
-def test_pinned_checksum_matches_the_release_archive(tmp_path: Path) -> None:
-    """The public installer pin is the SHA256 of a rebuild of this tree."""
+def test_release_build_is_deterministic_and_installer_pin_matches(tmp_path: Path) -> None:
+    """The release installer must pin the exact deterministic archive being published."""
     archive = tmp_path / f"devforge-{RELEASE}.tar.gz"
     digest = build_archive(ROOT, archive, RELEASE)
     again = build_archive(ROOT, tmp_path / "again.tar.gz", RELEASE)
@@ -167,3 +167,37 @@ def test_old_python_does_not_install_packages(tmp_path: Path) -> None:
     assert result.returncode != 0
     assert "Python 3.9+" in result.stderr
     assert not (prefix / "share/devforge").exists()
+
+
+def test_installer_bootstraps_without_download_hash_or_archive_utilities(tmp_path: Path) -> None:
+    import shutil
+    import sys
+
+    archive = tmp_path / f"devforge-{RELEASE}.tar.gz"
+    digest = build_archive(ROOT, archive, RELEASE)
+    port = _serve(tmp_path)
+    bindir = tmp_path / "minimal-bin"
+    bindir.mkdir()
+    for name in ("uname", "id", "mktemp", "rm", "mkdir", "cp", "tr", "chmod"):
+        source = shutil.which(name)
+        assert source
+        (bindir / name).symlink_to(source)
+    (bindir / "python3").symlink_to(sys.executable)
+    prefix = tmp_path / "minimal-install"
+    env = dict(
+        os.environ,
+        PATH=str(bindir),
+        DEVFORGE_PREFIX=str(prefix),
+        DEVFORGE_RELEASE_URL=f"http://127.0.0.1:{port}/devforge-{RELEASE}.tar.gz",
+        DEVFORGE_RELEASE_SHA256=digest,
+    )
+    result = subprocess.run(["/bin/sh", str(INSTALLER)], env=env, capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    # A subsequent PATH change must not replace the bootstrap interpreter.
+    (bindir / "python3").unlink()
+    (bindir / "python3").write_text("#!/bin/sh\nexit 99\n")
+    (bindir / "python3").chmod(0o755)
+    result = subprocess.run(
+        [str(prefix / "bin/devforge"), "--version"], env=env, capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr

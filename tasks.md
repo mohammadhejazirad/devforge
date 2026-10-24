@@ -140,7 +140,7 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 6. **Packaging:** `pyproject.toml` with setuptools and zero runtime dependencies. Dev tools (ruff, mypy, pytest) go in an optional `dev` extra only.
 7. **Side effects:** system-touching code will take injectable runners and root paths so tests never touch the host.
 8. **License:** MIT for the 1.0.0 public release. The spec allowed MIT or Apache-2.0 and the maintainer had not chosen; a public installer cannot ship with no license. Apache-2.0 can replace it later if the maintainer prefers.
-9. **Version:** Release `1.2.0` is the published installer archive. `install.sh` pins `v1.2.0` and SHA256 `25805006fb08e87a4f9e771aa93c73a18141429cc625bcfa8d9a724dedd0393c`. The pin test rebuilds this tree and requires the digest to match. A later release must update the pin only after its archive is built. `self-update` and a reinstall replace the program files and leave managed tools in place.
+9. **Version:** Release `1.3.0` is the installer target. `install.sh` pins `v1.3.0` and SHA256 `a218865925823eb4677e6762b1a02b4b0a4f287dc6dcc6e4e0a7d0cd551c7a68`. Release tests rebuild the tree and require the exact digest. Existing published archives are immutable; version bumps build and pin a new archive. `self-update` and a reinstall preserve managed tools.
 10. **CI Python:** pytest and ruff on 3.9 and 3.14. This machine is 3.14.4, so 3.14 is the pinned "latest" rather than a floating version. mypy stays on the 1.x line (`mypy>=1.13,<2`) because mypy 2 refuses a 3.9 target, and that line does not run on Python 3.14, so the mypy job uses Python 3.12. pytest is pinned to `<9` only on Python 3.9, because pytest 9 requires Python 3.10+. mypy does not parse pytest, and `shfmt` checks `install.sh` with `-i 4 -ci`.
 11. **Log path:** `$XDG_STATE_HOME/devforge/logs/devforge.log` when that variable is absolute, otherwise `~/.local/state/devforge/logs/devforge.log`. Relative XDG values are ignored. Append-only, with a 2MB rotation. Directory mode `0700`, file mode `0600`. Newlines in a message are folded into one line. A logging failure disables that logger and does not crash the program.
 12. **Markers:** `[ok]` and `[info]` go to stdout. `[warn]` and `[err]` go to stderr. Color is on when stdout is a TTY, unless `NO_COLOR` is set, `TERM=dumb`, or `--no-color` is passed. `FORCE_COLOR` turns color on for a non-TTY. Help text from argparse is always plain, including on Python 3.14.
@@ -160,3 +160,15 @@ The previous copy of this tracker lived at `.docs/tasks.md` (phase 0 only). That
 6. Should `AGENTS.md` / `AGENTS.fa.md` move to the repo root as section 4 shows, or stay in `.docs/`?
 7. Resolved for 1.0.0: the public repo is `mohammadhejazirad/devforge`, the default branch is `main`, and the installer URL in the README points there.
 8. Iranian mirror list: which operators to ship as initial community data? They will be marked unverified until the maintainer reviews them.
+
+
+### 2026-10-24 — Release-line updates and release 1.3.0
+
+- Updates retain major.minor for PHP/Python/Go and major for other indexed archive tools. Explicit install changes lines; partial versions resolve before installation.
+- Online lifecycle operations refresh indexes; distro updates refresh package metadata and check runtime candidate lines before upgrading. apt/RPM revisions remain visible.
+- Node archives support internal symlinks and root directories correctly. Extraction stages before replacement and executable layout checks precede completion markers.
+- npm/Composer/Yarn install their missing runtimes automatically. npm retains its major. Rust shims preserve managed homes and stable-channel updates respect pins.
+- Bootstrap uses Python for missing download/hash/archive utilities and resolves its interpreter. Unknown status and partial update failures are reported accurately.
+- Release: 1.3.0 is a minor release because dependency installation and update behavior change; no runtime dependency was added. Public assets are the deterministic tarball, SHA256SUMS, and install.sh.
+- Known limitations: PHP follows configured distro repositories; older-line discovery and checksums vary by upstream. Full distro-container coverage, generic dependency resolution, concurrent-install locks, and broader provider support remain open.
+- Local verification: 140 pytest tests on Python 3.14.4; ruff check/format; mypy on Python 3.12; shellcheck 0.10.0 and shfmt 3.10.0 all passed. Official Node 22.23.4 archive smoke verified SHA256 and executed node/npm/npx in a temporary directory. No system packages were changed.

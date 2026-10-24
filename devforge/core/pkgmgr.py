@@ -114,8 +114,7 @@ def parse_query(manager: str, text: str) -> tuple[str | None, str | None]:
     """Return ``(installed, candidate)`` version strings parsed from ``text``.
 
     Either value is ``None`` when the package manager did not report it.
-    Versions are reduced to ``major.minor.patch`` so epochs and revisions can
-    be compared.
+    Epochs and distro revisions are retained so backported fixes remain visible.
     """
     if manager == "apt":
         return _parse_apt(text)
@@ -145,7 +144,7 @@ def lookup_versions(manager: str, package: str, runner: Runner) -> tuple[str | N
         if installed_result.code == 0:
             parts = installed_result.stdout.split()
             if len(parts) >= 2:
-                installed = comparable(parts[1])
+                installed = _package_version(parts[1])
         candidate_result = runner.run(argv, timeout=20)
         _, candidate = parse_query(manager, candidate_result.stdout)
         return installed, candidate or installed
@@ -165,6 +164,14 @@ def comparable(value: str | None) -> str | None:
     return match.group(1)
 
 
+def _package_version(value: str | None) -> str | None:
+    """Retain epochs and distro revisions, including backported security fixes."""
+    if not value or value.lower() in {"none", "(none)"}:
+        return None
+    token = value.strip().rstrip(":")
+    return token if re.fullmatch(r"[0-9][A-Za-z0-9.+:~_-]*", token) else None
+
+
 def _names(packages: Sequence[str]) -> list[str]:
     names: list[str] = []
     for package in packages:
@@ -181,9 +188,9 @@ def _parse_apt(text: str) -> tuple[str | None, str | None]:
     candidate = None
     for line in text.splitlines():
         if "Installed:" in line:
-            installed = comparable(line.split(":", 1)[1].strip())
+            installed = _package_version(line.split(":", 1)[1].strip())
         elif "Candidate:" in line:
-            candidate = comparable(line.split(":", 1)[1].strip())
+            candidate = _package_version(line.split(":", 1)[1].strip())
     return installed, candidate
 
 
@@ -192,17 +199,22 @@ def _parse_rpm_info(text: str) -> tuple[str | None, str | None]:
     candidate: str | None = None
     section = ""
     version: str | None = None
+    revision = ""
+    epoch = ""
 
     def flush() -> None:
-        nonlocal installed, candidate, version
+        nonlocal installed, candidate, version, revision, epoch
         if version is None:
             return
-        parsed = comparable(version)
+        value = f"{epoch + ':' if epoch else ''}{version}{'-' + revision if revision else ''}"
+        parsed = _package_version(value)
         if section.startswith("Installed") and installed is None:
             installed = parsed
         elif section.startswith("Available") and parsed is not None:
             candidate = parsed
         version = None
+        revision = ""
+        epoch = ""
 
     for line in text.splitlines():
         stripped = line.strip()
@@ -210,8 +222,14 @@ def _parse_rpm_info(text: str) -> tuple[str | None, str | None]:
             flush()
             section = stripped
             continue
-        if stripped.lower().startswith("version"):
+        if stripped.lower().startswith("name") and ":" in stripped:
+            flush()
+        if stripped.lower().startswith("version") and ":" in stripped:
             version = stripped.split(":", 1)[1].strip()
+        elif stripped.lower().startswith("release") and ":" in stripped:
+            revision = stripped.split(":", 1)[1].strip()
+        elif stripped.lower().startswith("epoch") and ":" in stripped:
+            epoch = stripped.split(":", 1)[1].strip()
     flush()
     if candidate is None:
         candidate = installed
@@ -224,7 +242,7 @@ def _parse_labeled(text: str, label: str) -> tuple[str | None, str | None]:
     for line in text.splitlines():
         stripped = line.strip()
         if stripped.lower().startswith(prefix):
-            found = comparable(stripped.split(":", 1)[1] if ":" in stripped else "")
+            found = _package_version(stripped.split(":", 1)[1] if ":" in stripped else "")
             if found:
                 break
     return None, found
@@ -237,8 +255,8 @@ def _parse_apk(text: str) -> tuple[str | None, str | None]:
     for line in text.splitlines():
         stripped = line.strip()
         if "installed" in stripped.lower() and previous:
-            installed = comparable(previous)
-        version = comparable(stripped)
+            installed = _package_version(previous)
+        version = _package_version(stripped)
         if version:
             previous = stripped
             if candidate is None or version != installed:

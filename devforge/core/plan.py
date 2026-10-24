@@ -17,8 +17,10 @@ from devforge import strings as s
 from devforge.core.archive import ArchiveError, safe_extract
 from devforge.core.net import DownloadError, Fetcher, download, parse_checksum_text
 from devforge.core.paths import Paths
+from devforge.core.pkgmgr import comparable, lookup_versions
 from devforge.core.runner import Runner
 from devforge.core.state import StateError, backup_file, restore_backup
+from devforge.core.versioning import release_line
 from devforge.ui import Printer
 
 PIN_NAMES = {
@@ -58,6 +60,10 @@ class Step:
     checksum_url: str = ""
     checksum_name: str = ""
     env: tuple[tuple[str, str], ...] = ()
+    tool: str = ""
+    version: str = ""
+    manager: str = ""
+    packages: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {"title": self.title, "kind": self.kind}
@@ -74,6 +80,13 @@ class Step:
             payload["sha256"] = self.sha256
         if self.path:
             payload["path"] = self.path
+        if self.tool:
+            payload.update(
+                tool=self.tool,
+                version=self.version,
+                manager=self.manager,
+                packages=list(self.packages),
+            )
         return payload
 
 
@@ -188,6 +201,17 @@ def _write_json(ctx: ApplyContext, payload: dict[str, object]) -> None:
 
 
 def _apply_step(step: Step, ctx: ApplyContext) -> None:
+    if step.kind == "verify-install":
+        root = Path(step.path)
+        if not ctx.paths.contains(root):
+            raise ValueError(f"refusing to verify {root}")
+        for binary in step.packages:
+            if not any((root / prefix / binary).is_file() for prefix in ("bin", "")):
+                raise ValueError(f"Archive is missing the expected executable: {binary}")
+        return
+    if step.kind == "package-upgrade":
+        _package_upgrade_step(step, ctx)
+        return
     if step.kind == "command":
         _run_command(step, ctx)
         return
@@ -228,6 +252,23 @@ def _apply_step(step: Step, ctx: ApplyContext) -> None:
     if step.kind == "note":
         return
     raise ValueError(f"unknown plan step {step.kind}")
+
+
+def _package_upgrade_step(step: Step, ctx: ApplyContext) -> None:
+    # Check after refresh, immediately before the native upgrade. Runtime
+    # packages without a versioned name must never silently cross release lines.
+    if step.tool in {"php", "python", "java", "ruby", "dotnet", "node", "go"}:
+        for package in step.packages:
+            _installed, candidate = lookup_versions(step.manager, package, ctx.runner)
+            parsed = comparable(candidate)
+            if not parsed or release_line(step.tool, parsed) != release_line(
+                step.tool, step.version
+            ):
+                raise ValueError(
+                    f"Cannot safely update {step.tool} {step.version}: {package} candidate "
+                    f"is {candidate or 'unknown'}. Select another line explicitly with install."
+                )
+    _run_command(step, ctx)
 
 
 _DOTTED_VERSION = re.compile(r"(\d+)\.(\d+)")

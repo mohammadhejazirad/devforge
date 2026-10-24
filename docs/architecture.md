@@ -26,7 +26,7 @@ record into a plan. Strategies:
 - `package`: distro package. An explicit version uses `versioned_packages`
   when that family has them.
 - `external`: detect nvm or pyenv and refuse to install or remove them.
-- `npm`: delegate to the Node install; update is `npm install -g npm@latest`.
+- `npm`: delegate to the Node install; update uses an npm selector restricted to the current major release.
 - `rustup`: checksummed `rustup-init` under the data directory, or the
   rustup already on `PATH` when it is not one of our shims.
 
@@ -65,3 +65,26 @@ passed. Non-TTY output never contains escape codes.
 
 The logging helper is `core/log.py`, not `core/logging.py`, so it can never
 shadow the standard library `logging` module.
+
+## Release-line policy
+
+`update` preserves major.minor for PHP, Python, and Go, and major for other
+indexed tools. `install <tool> <version>` explicitly changes the line; partial
+archive versions resolve to a complete published version. `use` selects an
+installed version, while project and shell pins may retain a prefix. Rust
+updates an active stable channel; explicitly pinned toolchains stay pinned.
+
+Online archive updates refresh their index before selecting a release. Dry runs
+use local indexes. Missing older-line discovery is reported as blocked rather
+than silently moving to the latest major. Package updates refresh repositories
+first, validate runtime candidate lines at apply time, then invoke the native
+upgrade. Package epochs and revisions are retained for status comparisons.
+
+Archive extraction stages into a fresh directory and permits only internal
+symlinks, created after regular files and checked again as a complete graph.
+A completed-install marker is written after the executable layout is verified.
+Interrupted or incomplete directories are excluded from version selection.
+
+The bootstrap installer pins the published release, not the current working
+tree. Release preparation builds a new versioned archive, updates its pin, and verifies
+the exact digest in tests. Existing published release hashes are never rewritten.

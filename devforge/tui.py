@@ -151,8 +151,14 @@ def _tool_menu(ctx: Context, lines: Iterator[str], tool: ManagedTool) -> bool:
             ctx.printer.raw(f"  newest known: {status.latest}")
         if status.update_available is True:
             ctx.printer.raw("  update:       available")
-        elif status.installed_version:
+        elif status.update_available is False and status.installed_version:
             ctx.printer.raw("  update:       up to date")
+        elif status.installed_version:
+            ctx.printer.raw("  update:       unknown")
+        if status.update_target:
+            ctx.printer.raw(f"  update target: {status.update_target}")
+        if status.new_release_available:
+            ctx.printer.raw("  newer release line available; use Install a specific version")
         for note in status.notes:
             ctx.printer.raw(f"  note:         {note}")
         ctx.printer.raw("")
@@ -181,7 +187,7 @@ def _tool_options(status: ToolStatus) -> list[tuple[str, str]]:
     if status.name == "php":
         options.append(("Install PHP extensions", "php-extensions"))
     if status.can_update:
-        options.append(("Update", "update"))
+        options.append(("Update within the current release line", "update"))
     if status.can_switch:
         options.append(("Switch the default", "switch"))
         options.append(("Pin this directory", "pin"))

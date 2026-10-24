@@ -67,6 +67,8 @@ class ToolStatus:
     can_update: bool
     can_switch: bool
     can_uninstall: bool
+    update_target: str | None = None
+    new_release_available: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -85,4 +87,6 @@ class ToolStatus:
             "can_update": self.can_update,
             "can_switch": self.can_switch,
             "can_uninstall": self.can_uninstall,
+            "update_target": self.update_target,
+            "new_release_available": self.new_release_available,
         }

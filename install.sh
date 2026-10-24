@@ -6,9 +6,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
 set -eu
 
-VERSION="1.2.0"
-DEFAULT_URL="https://github.com/mohammadhejazirad/devforge/releases/download/v1.2.0/devforge-1.2.0.tar.gz"
-DEFAULT_SHA256="25805006fb08e87a4f9e771aa93c73a18141429cc625bcfa8d9a724dedd0393c"
+VERSION="1.3.0"
+DEFAULT_URL="https://github.com/mohammadhejazirad/devforge/releases/download/v1.3.0/devforge-1.3.0.tar.gz"
+DEFAULT_SHA256="a218865925823eb4677e6762b1a02b4b0a4f287dc6dcc6e4e0a7d0cd551c7a68"
 
 URL="${DEVFORGE_RELEASE_URL:-$DEFAULT_URL}"
 SHA256="${DEVFORGE_RELEASE_SHA256:-$DEFAULT_SHA256}"
@@ -56,17 +56,17 @@ install_python() {
     say "Installing Python 3. This changes system packages."
     if command -v apt-get >/dev/null 2>&1; then
         run_privileged apt-get update
-        run_privileged apt-get install -y python3
+        run_privileged apt-get install -y python3 ca-certificates
     elif command -v dnf >/dev/null 2>&1; then
-        run_privileged dnf install -y python3
+        run_privileged dnf install -y python3 ca-certificates
     elif command -v yum >/dev/null 2>&1; then
-        run_privileged yum install -y python3
+        run_privileged yum install -y python3 ca-certificates
     elif command -v pacman >/dev/null 2>&1; then
-        run_privileged pacman -Sy --noconfirm python
+        run_privileged pacman -Syu --noconfirm python ca-certificates
     elif command -v zypper >/dev/null 2>&1; then
-        run_privileged zypper --non-interactive install python3
+        run_privileged zypper --non-interactive install python3 ca-certificates
     elif command -v apk >/dev/null 2>&1; then
-        run_privileged apk add python3
+        run_privileged apk add python3 ca-certificates
     else
         die "no supported package manager found; install Python 3.9+ yourself"
     fi
@@ -78,7 +78,14 @@ download() {
     elif command -v wget >/dev/null 2>&1; then
         wget -q -O "$1" "$URL"
     else
-        die "curl or wget is required"
+        python3 - "$URL" "$1" <<'PY'
+import shutil
+import sys
+import urllib.request
+with urllib.request.urlopen(sys.argv[1], timeout=60) as source:
+    with open(sys.argv[2], "wb") as target:
+        shutil.copyfileobj(source, target)
+PY
     fi
 }
 
@@ -88,19 +95,16 @@ checksum() {
     elif command -v sha256 >/dev/null 2>&1; then
         sha256 -q "$1"
     else
-        die "sha256sum is required to verify the download"
+        python3 - "$1" <<'PY'
+import hashlib
+import sys
+digest = hashlib.sha256()
+with open(sys.argv[1], "rb") as source:
+    for chunk in iter(lambda: source.read(1024 * 1024), b""):
+        digest.update(chunk)
+print(digest.hexdigest())
+PY
     fi
-}
-
-assert_safe_member() {
-    member="$1"
-    case "$member" in
-        "devforge-${VERSION}" | "devforge-${VERSION}"/*) ;;
-        *) die "archive contains an unexpected member: $member" ;;
-    esac
-    case "$member" in
-        *..* | *\\*) die "archive contains an unsafe path: $member" ;;
-    esac
 }
 
 [ "$(uname -s)" = "Linux" ] || die "DevForge supports Linux only"
@@ -133,7 +137,9 @@ if ! command -v python3 >/dev/null 2>&1 || ! python_ok; then
     install_python
 fi
 python_ok || die "Python is still older than 3.9 after installation"
-need_cmd tar
+# Resolve the bootstrap interpreter so a later project Python pin cannot
+# accidentally run DevForge with an incompatible interpreter.
+PYTHON=$(python3 -c 'import os, sys; print(os.path.realpath(sys.executable))')
 
 tmpdir=$(mktemp -d)
 case "$tmpdir" in
@@ -150,11 +156,29 @@ download "$archive"
 actual=$(checksum "$archive")
 [ "$actual" = "$SHA256" ] || die "checksum mismatch (expected $SHA256, got $actual)"
 
-tar -tzf "$archive" >"$tmpdir/members"
-while IFS= read -r member; do
-    assert_safe_member "$member"
-done <"$tmpdir/members"
-tar -xzf "$archive" -C "$tmpdir"
+"$PYTHON" - "$archive" "$tmpdir" "$VERSION" <<'PY'
+import pathlib
+import shutil
+import sys
+import tarfile
+prefix = "devforge-" + sys.argv[3]
+with tarfile.open(sys.argv[1], "r:gz") as archive:
+    for member in archive.getmembers():
+        relative = pathlib.PurePosixPath(member.name)
+        if (relative.is_absolute() or not relative.parts or relative.parts[0] != prefix
+                or ".." in relative.parts or "\\" in member.name
+                or not (member.isdir() or member.isfile())):
+            raise SystemExit("devforge install: unexpected member: " + member.name)
+    for member in archive.getmembers():
+        target = pathlib.Path(sys.argv[2]) / member.name
+        if member.isdir():
+            target.mkdir(parents=True, exist_ok=True)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with archive.extractfile(member) as source, target.open("wb") as output:
+                shutil.copyfileobj(source, output)
+            target.chmod(0o644)
+PY
 src="$tmpdir/devforge-${VERSION}"
 [ -d "$src/devforge" ] || die "archive is missing the devforge package"
 [ -f "$src/devforge/__main__.py" ] || die "archive is missing the program entry point"
@@ -183,7 +207,7 @@ printf '%s\n' \
     '#!/bin/sh' \
     'set -eu' \
     "export PYTHONPATH=\"$DEST\${PYTHONPATH:+:\$PYTHONPATH}\"" \
-    'exec python3 -m devforge "$@"' \
+    "exec \"$PYTHON\" -m devforge \"\$@\"" \
     >"$launcher"
 chmod 755 "$launcher"
 

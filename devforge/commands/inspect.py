@@ -10,9 +10,8 @@ from devforge.context import Context
 from devforge.core.mirrors import MirrorError
 from devforge.core.net import DownloadError
 from devforge.core.state import StateError
-from devforge.core.versioning import is_valid_version, sort_versions
 from devforge.tools.base import Check
-from devforge.tools.catalog import CatalogError, VersionIndex, parse_refresh, save_index
+from devforge.tools.catalog import CatalogError, VersionIndex, refresh_index, save_index
 from devforge.tools.engine import active_mirror
 from devforge.tools.managed import ManagedTool, all_tools
 
@@ -191,6 +190,10 @@ def _print_status(ctx: Context, row: dict[str, object]) -> None:
     ctx.printer.raw(
         f"{row['name']}: {current} ({row['source']}), newest known {latest}, {update_text}"
     )
+    if row.get("update_target"):
+        ctx.printer.raw(f"  current-line update target: {row['update_target']}")
+    if row.get("new_release_available"):
+        ctx.printer.raw("  a newer release line exists; select it explicitly with install")
     ctx.printer.raw("  actions: " + (", ".join(flags) if flags else "none"))
     notes = row["notes"]
     if isinstance(notes, list):
@@ -233,29 +236,13 @@ def _refresh_index(ctx: Context, tool: ManagedTool, index: VersionIndex) -> Vers
         ctx.printer.error(f"{tool.name} has no upstream index to refresh.")
         return None
     try:
-        payload = ctx.fetcher.get(index.refresh_url, timeout=20)
-        versions, lts, latest, checksums = parse_refresh(index.refresh_format, payload)
+        refreshed = refresh_index(index, ctx.fetcher)
     except (DownloadError, CatalogError, OSError) as exc:
         ctx.printer.error(f"Could not refresh {tool.name}: {exc}")
         return None
-    merged = {version: dict(arches) for version, arches in index.sha256.items()}
-    for version, arches in checksums.items():
-        slot = dict(merged.get(version, {}))
-        slot.update(arches)
-        merged[version] = slot
-    kept = [item for item in versions if is_valid_version(item)]
-    refreshed = VersionIndex(
-        tool=tool.name,
-        versions=tuple(sort_versions(kept)),
-        lts=lts if is_valid_version(lts) else "",
-        latest=latest if is_valid_version(latest) else "",
-        sha256=merged,
-        refresh_format=index.refresh_format,
-        refresh_url=index.refresh_url,
-    )
     save_index(ctx.paths.cache, refreshed)
     if not ctx.as_json:
-        ctx.printer.ok(f"Saved {len(kept)} {tool.name} versions to the cache.")
+        ctx.printer.ok(f"Saved {len(refreshed.versions)} {tool.name} versions to the cache.")
     return refreshed
 
 
