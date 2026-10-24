@@ -10,11 +10,16 @@ permissions:
 jobs:
   python:
     name: python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.14"]
+        # Ubuntu 26.04 has no setup-python build for the minimum Python 3.9.
+        include:
+          - python-version: "3.9"
+            os: ubuntu-22.04
+          - python-version: "3.14"
+            os: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,7 +38,7 @@ jobs:
 
   mypy:
     name: mypy on python 3.12
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,7 +53,7 @@ jobs:
 
   shell:
     name: shellcheck and shfmt
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Install shellcheck and shfmt
