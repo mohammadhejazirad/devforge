@@ -6,11 +6,12 @@ executing them. Arguments are always a list. ``shell=True`` is never used.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 
 @dataclass(frozen=True)
@@ -40,6 +41,9 @@ class Runner(Protocol):
     ) -> RunResult:
         """Run one command and return its result."""
 
+    def stream(self, argv: Sequence[str], output: BinaryIO, *, timeout: float = 3600) -> RunResult:
+        """Stream binary stdout to a private backup file."""
+
     def which(self, name: str) -> str | None:
         """Return an executable path, or None when the name is not available."""
 
@@ -55,8 +59,10 @@ def _check_argv(argv: Sequence[str]) -> tuple[str, ...]:
         raise RunnerError("refusing to run an empty command")
     checked: list[str] = []
     for arg in argv:
-        if not isinstance(arg, str) or arg == "":
-            raise RunnerError("command arguments must be non-empty strings")
+        if not isinstance(arg, str) or "\0" in arg:
+            raise RunnerError("command arguments must be strings without NUL bytes")
+        if not checked and not arg:
+            raise RunnerError("command executable must not be empty")
         checked.append(arg)
     return tuple(checked)
 
@@ -73,6 +79,8 @@ class SubprocessRunner:
         cwd: str | None = None,
     ) -> RunResult:
         checked = _check_argv(argv)
+        command_env = dict(os.environ if env is None else env)
+        command_env["LC_ALL"] = "C"
         try:
             completed = subprocess.run(
                 checked,
@@ -80,7 +88,7 @@ class SubprocessRunner:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                env=None if env is None else dict(env),
+                env=command_env,
                 cwd=cwd,
             )
         except subprocess.TimeoutExpired as exc:
@@ -89,10 +97,38 @@ class SubprocessRunner:
             return RunResult(checked, 127, "", str(exc))
         return RunResult(checked, completed.returncode, completed.stdout, completed.stderr)
 
+    def stream(self, argv: Sequence[str], output: BinaryIO, *, timeout: float = 3600) -> RunResult:
+        import tempfile
+
+        checked = _check_argv(argv)
+        # stderr also goes to disk: a large database must not fill process memory.
+        with tempfile.TemporaryFile() as errors:
+            try:
+                result = subprocess.run(
+                    checked,
+                    stdout=output,
+                    stderr=errors,
+                    stdin=subprocess.DEVNULL,
+                    timeout=timeout,
+                    check=False,
+                )
+                code = result.returncode
+            except subprocess.TimeoutExpired:
+                code = 124
+            except OSError as exc:
+                return RunResult(checked, 127, "", str(exc))
+            errors.seek(0)
+            detail = errors.read(65536).decode("utf-8", errors="replace")
+        return RunResult(checked, code, "", detail or ("timed out" if code == 124 else ""))
+
     def which(self, name: str) -> str | None:
         if not name or "/" in name:
             return None
-        return shutil.which(name)
+        found = shutil.which(name)
+        if found:
+            return found
+        # Administrative binaries are often outside a desktop user's PATH.
+        return shutil.which(name, path="/usr/local/sbin:/usr/sbin:/sbin")
 
 
 class ScriptedRunner:
@@ -128,6 +164,11 @@ class ScriptedRunner:
             if predicate(checked):
                 return result
         return RunResult(checked, self.default_code, "", "")
+
+    def stream(self, argv: Sequence[str], output: BinaryIO, *, timeout: float = 3600) -> RunResult:
+        result = self.run(argv, timeout=timeout)
+        output.write(result.stdout.encode())
+        return result
 
     def which(self, name: str) -> str | None:
         return self.which_map.get(name)

@@ -806,15 +806,16 @@
     {
       "name": "mysql",
       "summary": "MySQL server from the distro packages",
-      "category": "service",
+      "category": "database",
       "strategy": "package",
       "binaries": [
+        "mysqld",
         "mysql"
       ],
       "version_args": [
         "--version"
       ],
-      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "version_regex": "Ver\\s+(\\d+\\.\\d+\\.\\d+)",
       "packages": {
         "debian": [
           "mysql-server"
@@ -832,22 +833,28 @@
           "mysql"
         ]
       },
-      "services": [
-        "mysql"
-      ]
+      "services": {
+        "rhel": [
+          "mysqld"
+        ],
+        "default": [
+          "mysql"
+        ]
+      }
     },
     {
       "name": "mariadb",
       "summary": "MariaDB server from the distro packages",
-      "category": "service",
+      "category": "database",
       "strategy": "package",
       "binaries": [
+        "mariadbd",
         "mariadb"
       ],
       "version_args": [
         "--version"
       ],
-      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)(?:-MariaDB| MariaDB)",
       "packages": {
         "debian": [
           "mariadb-server"
@@ -872,7 +879,7 @@
     {
       "name": "postgresql",
       "summary": "PostgreSQL from the distro packages",
-      "category": "service",
+      "category": "database",
       "strategy": "package",
       "binaries": [
         "psql"
@@ -905,7 +912,7 @@
     {
       "name": "redis",
       "summary": "Redis from the distro packages",
-      "category": "service",
+      "category": "database",
       "strategy": "package",
       "binaries": [
         "redis-server"
@@ -931,9 +938,14 @@
           "redis"
         ]
       },
-      "services": [
-        "redis"
-      ]
+      "services": {
+        "debian": [
+          "redis-server"
+        ],
+        "default": [
+          "redis"
+        ]
+      }
     },
     {
       "name": "nginx",
@@ -1183,6 +1195,163 @@
         "alpine": [
           "openssh-client"
         ]
+      }
+    },
+    {
+      "name": "mongodb",
+      "summary": "MongoDB server (configured distro repositories only)",
+      "category": "database",
+      "strategy": "package",
+      "binaries": [
+        "mongod"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "v(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "mongodb-org-server",
+          "mongodb-database-tools"
+        ],
+        "rhel": [
+          "mongodb-org-server",
+          "mongodb-database-tools"
+        ]
+      },
+      "services": [
+        "mongod"
+      ],
+      "notes": "Requires an already configured, trusted MongoDB vendor repository matching this distro release. DevForge never adds repositories. Backups require mongodump from MongoDB Database Tools."
+    },
+    {
+      "name": "kvm",
+      "summary": "KVM/QEMU and libvirt for Linux servers and desktops",
+      "category": "virtualization",
+      "strategy": "package",
+      "binaries": [
+        "virsh"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "qemu-system",
+          "libvirt-daemon-system",
+          "libvirt-clients"
+        ],
+        "rhel": [
+          "qemu-kvm",
+          "libvirt",
+          "virt-install"
+        ],
+        "arch": [
+          "qemu-full",
+          "libvirt",
+          "virt-install"
+        ],
+        "suse": [
+          "qemu-kvm",
+          "libvirt",
+          "virt-install"
+        ],
+        "alpine": [
+          "qemu-system-x86_64",
+          "libvirt",
+          "libvirt-client"
+        ]
+      },
+      "notes": "Requires hardware virtualization and /dev/kvm access. No VM disks, networks, or group permissions are changed automatically. Use the service menu to start libvirt when configured."
+    },
+    {
+      "name": "kvm-gui",
+      "summary": "Virtual Machine Manager (virt-manager), the KVM desktop GUI",
+      "category": "virtualization",
+      "strategy": "package",
+      "binaries": [
+        "virt-manager"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)",
+      "packages": {
+        "debian": [
+          "virt-manager"
+        ],
+        "rhel": [
+          "virt-manager"
+        ],
+        "arch": [
+          "virt-manager"
+        ],
+        "suse": [
+          "virt-manager"
+        ],
+        "alpine": [
+          "virt-manager"
+        ]
+      },
+      "desktop_only": true,
+      "notes": "Install KVM on the host separately. virt-manager can connect to a remote libvirt server over SSH."
+    },
+    {
+      "name": "zsh",
+      "summary": "Zsh interactive shell (configuration and login shell are separate choices)",
+      "category": "terminal",
+      "strategy": "package",
+      "binaries": [
+        "zsh"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "zsh (\\d+\\.\\d+(?:\\.\\d+)?)",
+      "packages": {
+        "debian": [
+          "zsh"
+        ],
+        "rhel": [
+          "zsh"
+        ],
+        "arch": [
+          "zsh"
+        ],
+        "suse": [
+          "zsh"
+        ],
+        "alpine": [
+          "zsh"
+        ]
+      }
+    },
+    {
+      "name": "starship",
+      "summary": "Cross-shell prompt installed from a verified official archive",
+      "category": "terminal",
+      "strategy": "archive",
+      "binaries": [
+        "starship"
+      ],
+      "version_args": [
+        "--version"
+      ],
+      "version_regex": "starship (\\d+\\.\\d+\\.\\d+)",
+      "shims": [
+        "starship"
+      ],
+      "archive": {
+        "format": "tar.gz",
+        "url": "https://github.com/starship/starship/releases/download/v{version}/starship-{arch}-unknown-linux-musl.tar.gz",
+        "checksum_url": "https://github.com/starship/starship/releases/download/v{version}/starship-{arch}-unknown-linux-musl.tar.gz.sha256",
+        "filename": "starship-{arch}-unknown-linux-musl.tar.gz",
+        "arch_map": {
+          "amd64": "x86_64",
+          "arm64": "aarch64",
+          "386": "i686"
+        }
       }
     }
   ]

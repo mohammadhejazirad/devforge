@@ -6,9 +6,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
 set -eu
 
-VERSION="1.3.0"
-DEFAULT_URL="https://github.com/mohammadhejazirad/devforge/releases/download/v1.3.0/devforge-1.3.0.tar.gz"
-DEFAULT_SHA256="a218865925823eb4677e6762b1a02b4b0a4f287dc6dcc6e4e0a7d0cd551c7a68"
+VERSION="1.4.0"
+DEFAULT_URL="https://github.com/mohammadhejazirad/devforge/releases/download/v1.4.0/devforge-1.4.0.tar.gz"
+DEFAULT_SHA256="4ec9b5acb87e8c5cb6c29050258d1fca0da9ac3cb03839ca1c597efd8e4beb69"
 
 URL="${DEVFORGE_RELEASE_URL:-$DEFAULT_URL}"
 SHA256="${DEVFORGE_RELEASE_SHA256:-$DEFAULT_SHA256}"
@@ -186,6 +186,7 @@ src="$tmpdir/devforge-${VERSION}"
 got_version=$(tr -d '[:space:]' <"$src/VERSION")
 [ "$got_version" = "$VERSION" ] || die "archive version is $got_version, expected $VERSION"
 
+[ ! -L "$DEST" ] || die "refusing a symlinked install directory"
 if [ -e "$DEST" ]; then
     if [ ! -f "$DEST/.devforge-install" ] && [ ! -d "$DEST/devforge" ]; then
         die "refusing to replace $DEST because it is not a DevForge install"
@@ -202,14 +203,49 @@ fi
 cp -a "$src/VERSION" "$DEST/VERSION"
 printf 'devforge\n' >"$DEST/.devforge-install"
 
+# Keep UI dependencies out of distro-managed Python (PEP 668).
+LAUNCH_PYTHON="$PYTHON"
+RUNTIME="$DEST/runtime"
+[ ! -L "$RUNTIME" ] || die "refusing a symlinked runtime directory"
+case "${DEVFORGE_INSTALL_TUI:-1}" in
+    1)
+        say "Preparing the isolated Textual runtime..."
+        if "$PYTHON" -I -m venv "$RUNTIME" &&
+            "$RUNTIME/bin/python" -I -m pip install --disable-pip-version-check --only-binary=:all: 'textual>=8.2,<9'; then
+            LAUNCH_PYTHON="$RUNTIME/bin/python"
+        else
+            say "[warn] Textual runtime setup failed; the command line and numbered menu remain available."
+            say "Install this distro's Python venv/ensurepip support, check PyPI access, and rerun the installer."
+        fi
+        ;;
+    0)
+        say "Textual runtime installation skipped (DEVFORGE_INSTALL_TUI=0)."
+        ;;
+    *) die "DEVFORGE_INSTALL_TUI must be 0 or 1" ;;
+esac
+
 launcher="$BIN_DIR/devforge"
-printf '%s\n' \
-    '#!/bin/sh' \
-    'set -eu' \
-    "export PYTHONPATH=\"$DEST\${PYTHONPATH:+:\$PYTHONPATH}\"" \
-    "exec \"$PYTHON\" -m devforge \"\$@\"" \
-    >"$launcher"
-chmod 755 "$launcher"
+"$PYTHON" -I - "$launcher" "$DEST" "$LAUNCH_PYTHON" <<'PYLAUNCH'
+import os
+import pathlib
+import shlex
+import sys
+import tempfile
+
+launcher, root, python = sys.argv[1:]
+code = f"import sys,runpy;sys.path.insert(0,{root!r});runpy.run_module('devforge',run_name='__main__')"
+text = ("#!/bin/sh\n# DevForge isolated launcher\nset -eu\n"
+        + "exec " + shlex.quote(python) + " -I -c " + shlex.quote(code) + ' "$@"\n')
+with tempfile.NamedTemporaryFile(mode="w", dir=pathlib.Path(launcher).parent, delete=False) as f:
+    temporary = pathlib.Path(f.name)
+    try:
+        f.write(text)
+        f.close()
+        temporary.chmod(0o755)
+        os.replace(temporary, launcher)
+    finally:
+        temporary.unlink(missing_ok=True)
+PYLAUNCH
 
 say "[ok] Installed DevForge ${VERSION} to ${DEST}"
 say "Run: ${launcher} --help"

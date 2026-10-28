@@ -34,7 +34,7 @@ def refresh(manager: str) -> list[str]:
         "apt": ["apt-get", "update"],
         "dnf": ["dnf", "-y", "makecache"],
         "yum": ["yum", "-y", "makecache"],
-        "pacman": ["pacman", "-Sy", "--noconfirm"],
+        "pacman": ["pacman", "-Dk"],
         "zypper": ["zypper", "--non-interactive", "refresh"],
         "apk": ["apk", "update"],
     }
@@ -46,7 +46,7 @@ def install(manager: str, packages: Sequence[str]) -> list[str]:
     require_manager(manager)
     names = _names(packages)
     if manager == "apt":
-        return ["apt-get", "install", "-y", *names]
+        return ["apt-get", "install", "-y", "--no-remove", *names]
     if manager == "dnf":
         return ["dnf", "install", "-y", *names]
     if manager == "yum":
@@ -63,7 +63,7 @@ def upgrade(manager: str, packages: Sequence[str]) -> list[str]:
     require_manager(manager)
     names = _names(packages)
     if manager == "apt":
-        return ["apt-get", "install", "-y", "--only-upgrade", *names]
+        return ["apt-get", "install", "-y", "--only-upgrade", "--no-remove", *names]
     if manager == "dnf":
         return ["dnf", "upgrade", "-y", *names]
     if manager == "yum":
@@ -264,3 +264,27 @@ def _parse_apk(text: str) -> tuple[str | None, str | None]:
     if candidate is None:
         candidate = installed
     return installed, candidate
+
+
+def installed_packages(manager: str, packages: Sequence[str], runner: Runner) -> list[str]:
+    """Query the installed database, never confuse a repository candidate with an install."""
+    require_manager(manager)
+    found: list[str] = []
+    for name in _names(packages):
+        if manager == "apt":
+            argv = ["dpkg-query", "-W", "-f=${db:Status-Status}", name]
+        elif manager in {"dnf", "yum", "zypper"}:
+            argv = ["rpm", "-q", "--", name]
+        elif manager == "pacman":
+            argv = ["pacman", "-Q", "--", name]
+        else:
+            argv = ["apk", "info", "-e", name]
+        result = runner.run(argv, timeout=20)
+        if result.code == 0 and (manager != "apt" or result.stdout.strip() == "installed"):
+            found.append(name)
+        elif result.code not in {0, 1}:
+            raise PackageManagerError(
+                f"Cannot inspect installed package {name}: {result.stderr.strip()}. "
+                "No packages were removed. Check the package database first."
+            )
+    return found

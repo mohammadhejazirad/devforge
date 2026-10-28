@@ -7,7 +7,8 @@ This document records decisions that are not obvious from the code.
 ```
 cli.py            parses arguments, builds a Printer and a Context, dispatches
 commands/         thin adapters: parse options, call core, return an exit code
-tui.py            numbered menu; opened by a bare `devforge` on a terminal
+textual_ui.py     full-screen UI; workers, cancellable dialogs and native-terminal handoff
+tui.py            numbered fallback and shared tool action adapters
 core/             detection, package managers, state, plan, net, mirrors, dns
 tools/            catalog, the shared engine, and one thin module per tool
 data/             catalog, version indexes, mirror profiles, DNS presets, presets
@@ -88,3 +89,7 @@ Interrupted or incomplete directories are excluded from version selection.
 The bootstrap installer pins the published release, not the current working
 tree. Release preparation builds a new versioned archive, updates its pin, and verifies
 the exact digest in tests. Existing published release hashes are never rewritten.
+
+Terminal personalization plans live in `core/terminal.py`. They select one component,
+keep a bounded Zsh config block, and reuse the CLI plan engine for confirmation.
+Textual imports are lazy so recovery commands work without the UI runtime.

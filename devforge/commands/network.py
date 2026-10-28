@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import re
 import time
@@ -170,6 +171,16 @@ def cmd_dns_set(ctx: Context, name: str) -> int:
         )
     resolver = detect_resolver(ctx.fs_root, ctx.runner)
     plan = Plan(title=f"Set DNS to {preset.name}")
+    snapshots = {
+        "networkmanager": "networkmanager-dns.json",
+        "systemd-resolved": "resolved-dns.json",
+    }
+    for kind, filename in snapshots.items():
+        if kind != resolver.kind and (ctx.paths.state / filename).exists():
+            plan.blocked = (
+                "Restore the previous DevForge DNS change before changing resolver backends."
+            )
+            return run_plan(ctx, plan)
     resolv = ctx.fs_root / "etc" / "resolv.conf"
     plan.add(Step(title=f"Back up {resolv}", kind="backup", path=str(resolv)))
     if resolver.kind == "systemd-resolved":
@@ -180,6 +191,33 @@ def cmd_dns_set(ctx: Context, name: str) -> int:
                 "Set the DNS servers in your network tool, or switch the resolver."
             )
             return run_plan(ctx, plan)
+        snapshot = ctx.paths.state / "resolved-dns.json"
+        if snapshot.exists():
+            saved = load_json(snapshot)
+            if saved.get("link") != link:
+                plan.blocked = "Restore the previous DNS change before selecting another link."
+                return run_plan(ctx, plan)
+        else:
+            result = ctx.runner.run(("resolvectl", "dns", link), timeout=10)
+            try:
+                if result.code or ":" not in result.stdout:
+                    raise ValueError("Cannot read the original per-link DNS servers.")
+                addresses = result.stdout.partition(":")[2].split()
+                for address in addresses:
+                    ipaddress.ip_address(address.split("%", 1)[0].split("#", 1)[0])
+            except ValueError as exc:
+                plan.blocked = str(exc)
+                return run_plan(ctx, plan)
+            plan.add(
+                Step(
+                    title="Save original systemd-resolved DNS settings",
+                    kind="write",
+                    path=str(snapshot),
+                    policy="owned",
+                    content=_dump({"link": link, "servers": addresses}),
+                )
+            )
+        plan.steps = [step for step in plan.steps if step.kind != "backup"]
         plan.add(
             Step(
                 title=f"Point {link} at {preset.name}",
@@ -197,6 +235,35 @@ def cmd_dns_set(ctx: Context, name: str) -> int:
                 "Connect a network and retry, or edit the connection by hand."
             )
             return run_plan(ctx, plan)
+        snapshot = ctx.paths.state / "networkmanager-dns.json"
+        if snapshot.exists():
+            saved = load_json(snapshot)
+            if saved.get("connection") != connection:
+                plan.blocked = (
+                    "Restore the previous DevForge DNS change before selecting another connection."
+                )
+                return run_plan(ctx, plan)
+        else:
+            values: dict[str, str] = {"connection": connection}
+            for field in ("ipv4.dns", "ipv4.ignore-auto-dns"):
+                result = ctx.runner.run(
+                    ("nmcli", "-g", field, "connection", "show", connection), timeout=10
+                )
+                if result.code:
+                    plan.blocked = "Cannot back up NetworkManager DNS settings: " + result.stderr
+                    return run_plan(ctx, plan)
+                values[field] = result.stdout.strip()
+            plan.add(
+                Step(
+                    title="Save original NetworkManager DNS settings",
+                    kind="write",
+                    path=str(snapshot),
+                    policy="owned",
+                    content=_dump(values),
+                )
+            )
+        # NetworkManager owns resolv.conf; back up its connection settings instead.
+        plan.steps = [step for step in plan.steps if step.kind != "backup"]
         plan.add(
             Step(
                 title=f"Set DNS on {connection}",
@@ -247,6 +314,74 @@ def cmd_dns_restore(ctx: Context) -> int:
     resolv = ctx.fs_root / "etc" / "resolv.conf"
     backup = Path(str(resolv) + ".devforge.bak")
     plan = Plan(title="Restore DNS")
+    resolved_snapshot = ctx.paths.state / "resolved-dns.json"
+    if resolved_snapshot.exists():
+        saved = load_json(resolved_snapshot)
+        saved_link = saved.get("link")
+        servers = saved.get("servers")
+        if not isinstance(saved_link, str) or not isinstance(servers, list):
+            plan.blocked = "Invalid systemd-resolved DNS snapshot."
+            return run_plan(ctx, plan)
+        try:
+            for server in servers:
+                if not isinstance(server, str):
+                    raise ValueError("Invalid saved DNS server.")
+                ipaddress.ip_address(server.split("%", 1)[0].split("#", 1)[0])
+        except ValueError as exc:
+            plan.blocked = str(exc)
+            return run_plan(ctx, plan)
+        plan.add(
+            Step(
+                title=f"Restore DNS servers on {saved_link}",
+                kind="command",
+                argv=("resolvectl", "dns", saved_link, *(servers or [""])),
+                sudo=True,
+                reason="Restoring systemd-resolved settings needs root.",
+            )
+        )
+        plan.add(
+            Step(title="Clear restored DNS snapshot", kind="delete", path=str(resolved_snapshot))
+        )
+        return run_plan(ctx, plan)
+    snapshot = ctx.paths.state / "networkmanager-dns.json"
+    if snapshot.exists():
+        saved = load_json(snapshot)
+        connection = saved.get("connection")
+        dns = saved.get("ipv4.dns")
+        auto = saved.get("ipv4.ignore-auto-dns")
+        if not isinstance(connection, str) or not isinstance(dns, str) or auto not in {"yes", "no"}:
+            plan.blocked = "Invalid NetworkManager DNS snapshot; settings were left unchanged."
+            return run_plan(ctx, plan)
+        # Empty strings restore the originally empty native DNS setting.
+        plan.add(
+            Step(
+                title="Restore NetworkManager DNS settings",
+                kind="command",
+                argv=(
+                    "nmcli",
+                    "connection",
+                    "modify",
+                    connection,
+                    "ipv4.dns",
+                    dns,
+                    "ipv4.ignore-auto-dns",
+                    auto,
+                ),
+                sudo=True,
+                reason="Restoring NetworkManager needs root.",
+            )
+        )
+        plan.add(
+            Step(
+                title=f"Reconnect {connection}",
+                kind="command",
+                argv=("nmcli", "connection", "up", connection),
+                sudo=True,
+                reason="Applying restored DNS needs root.",
+            )
+        )
+        plan.add(Step(title="Clear restored DNS snapshot", kind="delete", path=str(snapshot)))
+        return run_plan(ctx, plan)
     if not backup.exists() and not backup.is_symlink():
         plan.blocked = f"No DevForge backup exists for {resolv}."
         return run_plan(ctx, plan)

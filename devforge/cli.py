@@ -10,6 +10,8 @@ from typing import IO, TextIO
 
 from devforge import __version__
 from devforge import strings as s
+from devforge.commands.common import run_plan
+from devforge.commands.configuration import cmd_config
 from devforge.commands.files import (
     cmd_apply,
     cmd_export,
@@ -30,7 +32,12 @@ from devforge.commands.network import (
     cmd_mirror_test,
 )
 from devforge.commands.release import cmd_self_update
+from devforge.commands.services import ACTIONS, cmd_service
+from devforge.commands.terminal import cmd_terminal
 from devforge.context import Context, make_context
+from devforge.core.database import DATABASES, backup_plan
+from devforge.core.log import redact
+from devforge.core.terminal import ACTIONS as TERMINAL_ACTIONS
 from devforge.tools.base import Scope
 from devforge.tui import cmd_tui
 from devforge.ui import Printer
@@ -124,6 +131,25 @@ def build_parser() -> argparse.ArgumentParser:
         "--purge", action="store_true", help="Also remove package configuration."
     )
 
+    config = commands.add_parser(
+        "config", help="Inspect, validate or apply edited Nginx configuration."
+    )
+    config.add_argument("tool", choices=("nginx",))
+    config.add_argument("action", choices=("show", "check", "apply"))
+    config.add_argument("file", nargs="?", type=Path)
+
+    backup = commands.add_parser("backup", help="Create a private native database backup.")
+    backup.add_argument("tool", choices=DATABASES)
+    backup.add_argument("database", nargs="?", help="Database name; required for PostgreSQL.")
+    backup.add_argument(
+        "--client-config",
+        type=Path,
+        help="Private mongodump YAML config for authenticated MongoDB backups.",
+    )
+    service = commands.add_parser("service", help="Inspect or control a tool's system service.")
+    service.add_argument("tool")
+    service.add_argument("action", choices=ACTIONS)
+
     mirror = commands.add_parser("mirror", help="List, select, test, or clear a mirror profile.")
     mirror_cmds = mirror.add_subparsers(dest="mirror_action", required=True)
     mirror_cmds.add_parser("list", help="Show profiles. The default is upstream.")
@@ -157,7 +183,18 @@ def build_parser() -> argparse.ArgumentParser:
     shell_cmds.add_parser("install", help="Add the shim directory to the shell rc file.")
     shell_cmds.add_parser("remove", help="Remove the managed block from the shell rc file.")
 
-    commands.add_parser("tui", help="Open a numbered menu. Requires a terminal.")
+    tui = commands.add_parser("tui", help="Open the Textual interface. Requires a terminal.")
+    tui.add_argument("--plain", action="store_true", help="Use the numbered fallback menu.")
+    terminal = commands.add_parser(
+        "terminal", help="Choose Zsh plugins and prompt themes individually."
+    )
+    terminal.add_argument(
+        "action",
+        nargs="?",
+        default="show",
+        choices=("show", "install-zsh", "install-starship", *TERMINAL_ACTIONS),
+    )
+    terminal.add_argument("--theme", choices=("minimal", "midnight", "classic", "server"))
     commands.add_parser(
         "self-update",
         help="Install a newer DevForge release. Managed tools are left in place.",
@@ -199,6 +236,9 @@ def main(
             except KeyboardInterrupt:
                 printer.error(s.ERR_INTERRUPTED)
                 return 1
+            except (OSError, ValueError, RuntimeError) as exc:
+                printer.error("Cannot complete operation: " + redact(str(exc)))
+                return 1
         printer.error(s.ERR_NO_COMMAND)
         parser.print_help(printer.error_stream)
         return 2
@@ -214,6 +254,9 @@ def main(
         return _dispatch(ctx, args)
     except KeyboardInterrupt:
         printer.error(s.ERR_INTERRUPTED)
+        return 1
+    except (OSError, ValueError, RuntimeError) as exc:
+        printer.error("Cannot complete operation: " + redact(str(exc)))
         return 1
 
 
@@ -251,6 +294,12 @@ def _dispatch(ctx: Context, args: argparse.Namespace) -> int:
         return cmd_use(ctx, args.tool, args.version, scope=Scope.PROJECT)
     if command == "uninstall":
         return cmd_uninstall(ctx, args.tool, args.version, purge=bool(args.purge))
+    if command == "config":
+        return cmd_config(ctx, args.tool, args.action, args.file)
+    if command == "backup":
+        return run_plan(ctx, backup_plan(ctx, args.tool, args.database, args.client_config))
+    if command == "service":
+        return cmd_service(ctx, args.tool, args.action)
     if command == "mirror":
         return _mirror(ctx, args)
     if command == "dns":
@@ -265,8 +314,10 @@ def _dispatch(ctx: Context, args: argparse.Namespace) -> int:
         return cmd_export(ctx)
     if command == "shell":
         return cmd_shell(ctx, str(args.shell_action))
+    if command == "terminal":
+        return cmd_terminal(ctx, args.action, args.theme)
     if command == "tui":
-        return cmd_tui(ctx)
+        return cmd_tui(ctx, plain=args.plain)
     if command == "self-update":
         return cmd_self_update(ctx)
     ctx.printer.error(s.ERR_UNKNOWN_COMMAND.format(name=command))

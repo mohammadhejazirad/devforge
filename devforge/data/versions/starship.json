@@ -1,0 +1,22 @@
+{
+  "tool": "starship",
+  "versions": [
+    "1.27.0"
+  ],
+  "latest": "1.27.0",
+  "lts": "",
+  "sha256": {
+    "1.27.0": {
+      "arm64": "341f5cbf24699fa0b27ec88965ad25f862ea09e15d35a543fd6ffdff1d2aa00d",
+      "arm64-musl": "341f5cbf24699fa0b27ec88965ad25f862ea09e15d35a543fd6ffdff1d2aa00d",
+      "386": "3ccbd2aca8e8189f13272e71d51549001694bceb82191b28d009efe1ef597f7f",
+      "386-musl": "3ccbd2aca8e8189f13272e71d51549001694bceb82191b28d009efe1ef597f7f",
+      "amd64": "10c8eb4cb3b761d9bf59ea828444c2dab36c900b7d69a69e08814b286969df89",
+      "amd64-musl": "10c8eb4cb3b761d9bf59ea828444c2dab36c900b7d69a69e08814b286969df89"
+    }
+  },
+  "refresh": {
+    "format": "github",
+    "url": "https://api.github.com/repos/starship/starship/releases/latest"
+  }
+}

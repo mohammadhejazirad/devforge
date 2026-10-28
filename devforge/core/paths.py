@@ -91,12 +91,12 @@ class Paths:
         """
         try:
             target = Path(candidate).expanduser().resolve()
-        except OSError:
+        except (OSError, RuntimeError):
             return False
         for root in self.owned_roots():
             try:
                 resolved_root = root.expanduser().resolve()
-            except OSError:
+            except (OSError, RuntimeError):
                 continue
             if target != resolved_root and resolved_root in target.parents:
                 return True

@@ -413,15 +413,15 @@ def test_menu_exits_on_zero(tmp_path: Path) -> None:
     assert menu(ctx, iter(["0"])) == 0
     text = out.getvalue()
     assert "DevForge" in text
-    assert "php" in text
-    assert "node" in text
+    assert "Languages" in text
+    assert "Databases" in text
     assert "Update DevForge" in text
     assert "not installed" in text
 
 
 def test_menu_opens_a_tool_then_returns(tmp_path: Path) -> None:
     ctx, out, _err = machine(tmp_path, "debian-12", family="debian")
-    assert menu(ctx, iter(["1", "0", "0"])) == 0
+    assert menu(ctx, iter(["1", "1", "0", "0", "0"])) == 0
     text = out.getvalue()
     assert "Install the preferred version" in text
     assert "back" in text
@@ -465,5 +465,5 @@ def test_cli_dispatch_uses_a_private_home(tmp_path: Path, monkeypatch: pytest.Mo
 
 
 def test_known_tool_count() -> None:
-    assert len(all_tools()) == 35
+    assert len(all_tools()) == 40
     assert load_tool("redis").name == "redis"

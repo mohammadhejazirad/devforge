@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "devforge"
-version = "1.3.0"
+version = "1.4.0"
 description = "Terminal-based developer-environment provisioning and version management for Linux."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -25,12 +25,13 @@ classifiers = [
   "Topic :: System :: Installation/Setup",
   "Topic :: System :: Systems Administration",
 ]
-dependencies = []
+dependencies = ["textual>=8.2,<9"]
 
 [project.optional-dependencies]
 dev = [
-  # mypy 2.x refuses a 3.9 target, and mypy 1.x does not run on Python 3.14.
-  "mypy>=1.13,<2; python_version < '3.14'",
+  # mypy 1.20.2 crashes internally on this project; 1.19.1 passes.
+  # mypy 1.x does not run on Python 3.14.
+  "mypy>=1.13,<1.20; python_version < '3.14'",
   # pytest 9 requires Python 3.10+.
   "pytest>=8,<9; python_version < '3.10'",
   "pytest>=8; python_version >= '3.10'",

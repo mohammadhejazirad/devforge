@@ -4,7 +4,8 @@ DevForge installs, updates, switches, pins, and removes development tools on
 Linux. It detects the machine, shows a plan, and changes the system only after
 you confirm. The same commands work on a desktop and on a server.
 
-This tree is **version 1.3.0**. It manages languages, package tools,
+The current release is **version 1.4.0**. Administration and backup details are in
+[docs/administration.fa.md](docs/administration.fa.md). It manages languages, package tools,
 infrastructure, databases, and everyday utilities. A Persian walkthrough is in
 [docs/guide.fa.md](docs/guide.fa.md).
 
@@ -12,18 +13,20 @@ infrastructure, databases, and everyday utilities. A Persian walkthrough is in
 
 - Linux. Tested families: Debian/Ubuntu (including Mint and Pop!_OS),
   Fedora/RHEL (Rocky, Alma, CentOS Stream), Arch/Manjaro, openSUSE, and Alpine.
-- Python 3.9 or newer. The program uses only the standard library.
+- Python 3.9 or newer. The full-screen interface uses Textual 8.x.
+  Core commands and the numbered fallback still run without UI dependencies.
 - A normal user with `sudo` for distro packages. Official archives install
   into your home directory and do not need root.
 
 ## Install
 
-### From a checkout (version 1.3.0)
+### From a checkout (version 1.4.0)
 
 ```bash
 git clone https://github.com/mohammadhejazirad/devforge.git
 cd devforge
 python3 -m devforge --help
+uv run devforge
 ```
 
 You can also install the checkout as a command:
@@ -33,27 +36,28 @@ python3 -m pip install --user -e .
 devforge --version
 ```
 
-That prints `devforge 1.3.0` from this tree.
+That prints `devforge 1.4.0` from this tree.
 
-### Published installer (release 1.3.0)
+### Release installer (1.4.0)
+
+Download and run the versioned installer:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mohammadhejazirad/devforge/main/install.sh | bash
+curl -fsSLo install-devforge.sh https://github.com/mohammadhejazirad/devforge/releases/download/v1.4.0/install.sh
+bash install-devforge.sh
 ```
 
-`install.sh` downloads `devforge-1.3.0.tar.gz` from the GitHub release, checks
-the SHA256 pinned in the script, and installs into `~/.local` (or `/usr/local`
-when run as root). It does not run any other remote script. Python is installed through the system package manager after approval when needed;
-the installer can download, hash, and extract using Python without curl, wget,
-sha256sum, or tar already installed (after the script itself has been obtained).
-Running it again
-replaces the program and leaves `tools/`, `shims/`, and `env.sh` in place.
+Existing installations can run `devforge self-update`. The installer pins the
+deterministic 1.4.0 archive and verifies its SHA256 before extraction.
+
+The installer verifies SHA256 and uses an isolated Python launcher. Reinstalling
+preserves `tools/`, `shims/`, and `env.sh`.
 
 If you still have the old 1.0.0 command, run `install.sh` once more. That
 release cannot update itself. From 1.1.0 on, use `devforge self-update`.
 
-Release 1.3.0 separates current-line updates from explicit version changes and
-fixes Node archive extraction and runtime dependencies. See [CHANGELOG.md](CHANGELOG.md).
+Release 1.4.0 adds the Textual interface, opt-in terminal personalization, database
+backups, KVM management, and safer service administration. See [CHANGELOG.md](CHANGELOG.md).
 
 ## What you can manage
 
@@ -62,7 +66,9 @@ fixes Node archive extraction and runtime dependencies. See [CHANGELOG.md](CHANG
 | Languages | PHP, Node.js, Go, Python, Rust, Java, Ruby, .NET, Bun, Deno |
 | Package tools | NVM, npm, pnpm, Yarn, Composer, pipx, uv, pyenv |
 | Infrastructure | Docker and Compose, Git, kubectl, Helm, Terraform |
-| Services | MySQL, MariaDB, PostgreSQL, Redis, Nginx, Caddy |
+| Services | MySQL, MariaDB, PostgreSQL, MongoDB, Redis, Nginx, Caddy |
+| Virtualization | KVM/QEMU/libvirt, virt-manager (`kvm-gui`, desktop only) |
+| Terminal | Zsh, Starship, selectable local-history suggestions and syntax highlighting |
 | Utilities | build tools, curl, jq, tmux, ripgrep, OpenSSH |
 
 For every tool, DevForge can show what is installed, list known versions, and
@@ -177,24 +183,35 @@ devforge --dry-run preset apply web-php
 | `go-backend` | go, git, docker |
 | `devops` | docker, kubectl, helm, terraform, git, jq |
 
-Run `devforge` with no arguments in a terminal to open the menu. It lists every
-tool, what is installed, and the actions below. Pick a number to install,
-update, switch, pin, or remove that tool. Pick a letter for this computer,
-doctor, presets, mirrors, DNS, shell setup, or a DevForge update.
+Run `devforge` with no arguments in a terminal to open the Textual interface.
+Choose Tokyo Night, Catppuccin, Nord, Dracula or Light from the theme selector.
+Choose a category, a tool, then an operation. Database backups and saved-backup
+lists live under each database; service controls live under each service. Nginx
+also has a configuration submenu. Installed-version selection uses detected
+versions, rather than the download index. `devforge tui` opens the same menu.
+The interface works over SSH. `devforge tui --plain` uses the numbered fallback,
+which is also selected when Textual is unavailable or `TERM=dumb`. Colors respect
+`NO_COLOR` and `--no-color`. Every change defaults to **No**, including end-of-input.
 
-```text
-DevForge 1.3.0
-  Ubuntu 24.04 (debian) | apt
-
-Tools  (enter a number)
-  Languages
-     1  php          8.3.6  (newer 8.5)
-     2  node         not installed
-Actions  (enter a letter)
-   g  Update DevForge
-   0  Exit
-Choice:
+```bash
+devforge backup mysql app
+devforge backup mariadb
+devforge backup postgresql app
+devforge backup mongodb app --client-config ~/.config/mongodb/dump.yml
+devforge backup redis
+devforge service nginx status
+devforge config nginx check
+devforge --dry-run config nginx apply ./edited-nginx.conf
+devforge --dry-run install kvm
+devforge install kvm-gui
 ```
+
+Backups use installed native clients and their authentication configuration.
+They stream to private files in `~/.local/state/devforge/backups/<engine>/`;
+failed or empty dumps are not published. PostgreSQL needs a database name and
+Redis backs up the whole instance. Dumps are unencrypted and consistency depends
+on the database's workload and deployment. See the
+[administration guide](docs/administration.fa.md) for limitations and client setup.
 
 Open PHP in that menu and choose **Install PHP extensions**. The list is grouped
 (databases, images, cache, and the rest) and every package uses the PHP line
@@ -268,7 +285,11 @@ detected, the plan stops and tells you what to do by hand.
 
 - Plans show the exact command. Root steps are prefixed with `sudo --` and a
   reason when you are not root.
-- Config edits keep the first `*.devforge.bak`.
+- Config edits keep the first `*.devforge.bak`; Nginx config replacement validates
+  before and after writing, and restores preceding contents on validation failure.
+- Package removal checks installed packages. On apt, a dependency simulation is
+  shown and protected dependency removals are refused. Distro Python removal is blocked.
+- Arch operations never run `pacman -Sy`; run a full `pacman -Syu` yourself first.
 - Deletes are refused unless the path is inside a DevForge data, state,
   config, or cache directory.
 - Version strings are checked before they are used in a path or a command.
@@ -304,3 +325,28 @@ mypy
 
 The dev tools are never required to run DevForge. See `CONTRIBUTING.md` and
 `docs/architecture.md`.
+
+Review scope and remaining constraints: [docs/safety.md](docs/safety.md).
+
+## Terminal studio
+
+Zsh, history suggestions, syntax highlighting, native Zsh themes and Starship
+are separate choices. No component is selected for installation by default.
+Selecting a theme does not implicitly install its shell or prompt engine.
+Open **Terminal studio** in the sidebar or use:
+
+```bash
+uv run devforge terminal install-zsh
+uv run devforge terminal autosuggestions
+uv run devforge terminal zsh-theme --theme midnight
+uv run devforge terminal install-starship
+uv run devforge terminal starship-theme --theme server
+```
+
+Existing `.zshrc` content is preserved outside a backed-up managed block;
+changing the login shell is a separate, explicit action. Plugin archives have
+pinned SHA256 checksums and Starship uses official verified musl builds.
+See [the terminal guide](docs/terminal.fa.md) for choices, removal, distro support
+and the review of the supplied setup-zsh.sh reference. The release installer
+creates an isolated Textual runtime; set `DEVFORGE_INSTALL_TUI=0` for CLI-only
+installation. A missing venv/PyPI connection produces actionable fallback output.

@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
+import sys
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -168,7 +171,7 @@ def launcher_path(root: Path) -> Path | None:
         text = candidate.read_text(encoding="utf-8")
     except OSError:
         return None
-    if "python3 -m devforge" not in text:
+    if "python3 -m devforge" not in text and "# DevForge isolated launcher" not in text:
         return None
     return candidate
 
@@ -290,24 +293,37 @@ def _remove_owned(path: Path) -> None:
 def _replace_file(source: Path, dest: Path) -> None:
     if dest.name not in {"VERSION", "LICENSE"}:
         raise ReleaseError(f"refusing to replace {dest.name}")
-    temporary = dest.with_name(dest.name + ".tmp")
-    temporary.write_bytes(source.read_bytes())
-    os.replace(temporary, dest)
+    _atomic_file(dest, source.read_bytes())
+
+
+def _atomic_file(dest: Path, payload: bytes, mode: int = 0o644) -> None:
+    with tempfile.NamedTemporaryFile(dir=dest.parent, prefix=".release-", delete=False) as f:
+        temporary = Path(f.name)
+        try:
+            f.write(payload)
+            f.flush()
+            os.fsync(f.fileno())
+            f.close()
+            temporary.chmod(mode)
+            os.replace(temporary, dest)
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 def _write_launcher(launcher: Path, root: Path) -> None:
     if launcher.name != "devforge":
         raise ReleaseError("refusing to rewrite an unexpected launcher")
-    text = (
-        "#!/bin/sh\n"
-        "set -eu\n"
-        f'export PYTHONPATH="{root}${{PYTHONPATH:+:$PYTHONPATH}}"\n'
-        'exec python3 -m devforge "$@"\n'
+    code = (
+        f"import sys,runpy;sys.path.insert(0,{str(root)!r});"
+        "runpy.run_module('devforge',run_name='__main__')"
     )
-    temporary = launcher.with_name(launcher.name + ".tmp")
-    temporary.write_text(text, encoding="utf-8")
-    os.chmod(temporary, 0o755)
-    os.replace(temporary, launcher)
+    runtime = root / "runtime" / "bin" / "python"
+    interpreter = str(runtime) if runtime.is_file() else sys.executable
+    text = (
+        "#!/bin/sh\n# DevForge isolated launcher\nset -eu\n"
+        f'exec {shlex.quote(interpreter)} -I -c {shlex.quote(code)} "$@"\n'
+    )
+    _atomic_file(launcher, text.encode("utf-8"), 0o755)
 
 
 def _read_cache(ctx: Context) -> tuple[float, ReleaseNotice] | None:

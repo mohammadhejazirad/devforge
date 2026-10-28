@@ -142,9 +142,9 @@ def test_self_update_replaces_the_program_and_keeps_tools(tmp_path: Path) -> Non
     assert (install / "devforge" / "__main__.py").is_file()
     launcher = install.parent.parent / "bin" / "devforge"
     script = launcher.read_text(encoding="utf-8")
-    assert "python3 -m devforge" in script
+    assert " -I -c" in script
     assert str(install) in script
-    assert __version__ == "1.3.0"
+    assert __version__ == "1.4.0"
 
 
 def test_menu_update_refuses_a_checkout(tmp_path: Path) -> None:

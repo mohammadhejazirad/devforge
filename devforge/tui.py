@@ -9,17 +9,23 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Iterator
+from pathlib import Path
 from typing import IO
 
 from devforge import __version__
 from devforge import strings as s
 from devforge.commands.common import run_plan
+from devforge.commands.configuration import cmd_config
 from devforge.commands.files import _load_presets, cmd_preset_apply, cmd_shell
 from devforge.commands.inspect import cmd_doctor, cmd_info, cmd_status, cmd_versions
 from devforge.commands.lifecycle import cmd_install, cmd_uninstall, cmd_update, cmd_use
 from devforge.commands.network import cmd_dns_restore, cmd_dns_set, cmd_mirror_reset, cmd_mirror_set
 from devforge.commands.release import cmd_self_update
+from devforge.commands.services import ACTIONS, cmd_service
+from devforge.commands.terminal import OPTIONS as TERMINAL_OPTIONS
+from devforge.commands.terminal import cmd_terminal
 from devforge.context import Context
+from devforge.core.database import DATABASES, backup_plan
 from devforge.core.dns import DnsError, load_presets
 from devforge.core.mirrors import load_profiles
 from devforge.core.release import check_newer
@@ -40,16 +46,34 @@ _CATEGORIES = (
     ("runtime", "Languages"),
     ("manager", "Package tools"),
     ("infra", "Infrastructure"),
-    ("service", "Services"),
+    ("database", "Databases"),
+    ("service", "Web & system services"),
+    ("virtualization", "Virtualization / KVM"),
     ("utility", "Utilities"),
+    ("terminal", "Terminal & prompts"),
 )
 
 
-def cmd_tui(ctx: Context, *, force: bool = False) -> int:
+def cmd_tui(ctx: Context, *, force: bool = False, plain: bool = False) -> int:
     """Open the menu, or tell the user to pass a command when this is not a terminal."""
     if not force and not _interactive(ctx.printer.stream):
         ctx.printer.error(s.ERR_MENU_NEEDS_TTY)
         return 2
+    if ctx.as_json:
+        ctx.printer.error("The interactive interface cannot produce JSON. Use an explicit command.")
+        return 2
+    if not plain and ctx.env.get("TERM") != "dumb":
+        try:
+            from devforge.textual_ui import run_textual
+        except ModuleNotFoundError as exc:
+            if (exc.name or "").startswith("devforge"):
+                raise
+            ctx.printer.warn(
+                "Textual is unavailable. Install the project with pip or uv to enable "
+                "the full interface. Opening the numbered fallback."
+            )
+        else:
+            return run_textual(ctx)
     return menu(ctx, _stdin_lines())
 
 
@@ -71,8 +95,9 @@ def menu(ctx: Context, lines: Iterator[str]) -> int:
             continue
         if choice.isdigit():
             index = int(choice)
-            if 1 <= index <= len(rows):
-                if _tool_menu(ctx, lines, rows[index - 1][0]):
+            groups = _groups(rows)
+            if 1 <= index <= len(groups):
+                if _category_menu(ctx, lines, *groups[index - 1]):
                     ctx.printer.info("Checking installed tools...")
                     rows = _inventory(ctx)
                 continue
@@ -82,37 +107,54 @@ def menu(ctx: Context, lines: Iterator[str]) -> int:
 def _draw_home(ctx: Context, rows: list[tuple[ManagedTool, str]]) -> None:
     system = ctx.system()
     ctx.printer.raw("")
-    ctx.printer.info(f"DevForge {__version__}")
+    ctx.printer.heading(f"DevForge {__version__}", "Linux workstation & server management")
     manager = system.package_manager or "no package manager"
-    ctx.printer.raw(f"  {system.pretty_name} ({system.family}) | {manager}")
+    ctx.printer.raw(f"  {system.pretty_name} ({system.family}) | {manager} | {system.form_factor}")
     notice = check_newer(ctx)
     if notice is not None:
         ctx.printer.info(s.INFO_RELEASE_AVAILABLE.format(version=notice.version))
     ctx.printer.raw("")
-    ctx.printer.raw("Tools  (enter a number)")
-    grouped: dict[str, list[tuple[int, ManagedTool, str]]] = {}
-    for number, (tool, label) in enumerate(rows, start=1):
-        grouped.setdefault(tool.spec.category, []).append((number, tool, label))
-    shown: set[str] = set()
-    for category, title in _CATEGORIES:
-        items = grouped.get(category, [])
-        if not items:
-            continue
-        shown.add(category)
-        ctx.printer.raw(f"  {title}")
-        for number, tool, label in items:
-            ctx.printer.raw(f"    {number:>2}  {tool.name:<12} {label}")
-    for category, items in grouped.items():
-        if category in shown:
-            continue
-        ctx.printer.raw(f"  {category}")
-        for number, tool, label in items:
-            ctx.printer.raw(f"    {number:>2}  {tool.name:<12} {label}")
+    ctx.printer.raw("Categories  (enter a number)")
+    for index, (title, items) in enumerate(_groups(rows), 1):
+        installed = sum(label != "not installed" for _, label in items)
+        ctx.printer.step(f"{index}  {title:<27} [{installed}/{len(items)} installed]")
+    ctx.printer.raw("  Open a category to see installed / not installed tools.")
     ctx.printer.raw("")
     ctx.printer.raw("Actions  (enter a letter)")
-    for key, label in _ACTION_LABELS:
-        ctx.printer.raw(f"   {key}  {label}")
+    for offset in range(0, len(_ACTION_LABELS), 2):
+        pair = _ACTION_LABELS[offset : offset + 2]
+        ctx.printer.raw("  " + "  ".join(f"{key}  {label:<33}" for key, label in pair).rstrip())
     ctx.printer.raw("   0  Exit")
+
+
+def _groups(rows: list[tuple[ManagedTool, str]]) -> list[tuple[str, list[tuple[ManagedTool, str]]]]:
+    groups = []
+    for category, title in _CATEGORIES:
+        items = [(tool, label) for tool, label in rows if tool.spec.category == category]
+        if items:
+            groups.append((title, items))
+    return groups
+
+
+def _category_menu(
+    ctx: Context, lines: Iterator[str], title: str, rows: list[tuple[ManagedTool, str]]
+) -> bool:
+    changed = False
+    while True:
+        ctx.printer.heading(title, "Select a tool to manage its versions, service and backups")
+        for index, (tool, label) in enumerate(rows, 1):
+            ctx.printer.raw(f"  {index:>2}  {tool.name:<14} {label}")
+        ctx.printer.raw("   0  back")
+        choice = _ask(ctx, lines, "Tool")
+        if choice is None or choice == "0":
+            return changed
+        if choice.isdigit() and 1 <= int(choice) <= len(rows):
+            if _tool_menu(ctx, lines, rows[int(choice) - 1][0]):
+                changed = True
+                fresh = {tool.name: label for tool, label in _inventory(ctx)}
+                rows = [(tool, fresh.get(tool.name, label)) for tool, label in rows]
+        else:
+            ctx.printer.error("Enter a number from the list.")
 
 
 def _inventory(ctx: Context) -> list[tuple[ManagedTool, str]]:
@@ -183,7 +225,11 @@ def _tool_options(status: ToolStatus) -> list[tuple[str, str]]:
     options: list[tuple[str, str]] = []
     if status.can_install:
         options.append(("Install the preferred version", "install"))
-        options.append(("Install a specific version", "install-version"))
+        from devforge.tools.managed import load_tool
+
+        spec = load_tool(status.name).spec
+        if spec.strategy != "package" or spec.versioned_packages:
+            options.append(("Install a specific version", "install-version"))
     if status.name == "php":
         options.append(("Install PHP extensions", "php-extensions"))
     if status.can_update:
@@ -193,12 +239,57 @@ def _tool_options(status: ToolStatus) -> list[tuple[str, str]]:
         options.append(("Pin this directory", "pin"))
     if status.can_uninstall:
         options.append(("Uninstall", "uninstall"))
+    if status.name in {"zsh", "starship"}:
+        options.append(("Open Terminal studio", "terminal"))
+    if status.name == "nginx":
+        options.append(("Configuration", "config"))
+    if status.name in DATABASES:
+        options.append(("Database backups", "backups"))
+    from devforge.tools.managed import load_tool
+
+    if load_tool(status.name).spec.services or status.name == "kvm":
+        options.append(("Manage system service", "service"))
+    options.append(("Show installed versions", "installed"))
     options.append(("Show full status", "status"))
     options.append(("List known versions", "versions"))
     return options
 
 
 def _run_tool_action(ctx: Context, lines: Iterator[str], tool: ManagedTool, kind: str) -> bool:
+    if kind == "terminal":
+        _terminal(ctx, lines)
+        return False
+    if kind == "config":
+        ctx.printer.heading("nginx / Configuration")
+        ctx.printer.raw("  1  Show nginx.conf")
+        ctx.printer.raw("  2  Check configuration")
+        ctx.printer.raw("  3  Apply an edited configuration file")
+        ctx.printer.raw("  0  back")
+        choice = _ask(ctx, lines, "Configuration action")
+        if choice in {"1", "2"}:
+            cmd_config(ctx, "nginx", "show" if choice == "1" else "check")
+        elif choice == "3":
+            source = _ask(ctx, lines, "Path to edited nginx.conf")
+            if source:
+                cmd_config(ctx, "nginx", "apply", Path(source).expanduser())
+        return False
+    if kind == "backups":
+        return _backup_menu(ctx, lines, tool)
+    if kind == "service":
+        ctx.printer.heading(f"{tool.name} / Service")
+        for index, action in enumerate(ACTIONS, 1):
+            ctx.printer.raw(f"  {index}  {action}")
+        ctx.printer.raw("  0  back")
+        choice = _ask(ctx, lines, "Service action")
+        if choice and choice.isdigit() and 1 <= int(choice) <= len(ACTIONS):
+            cmd_service(ctx, tool.name, ACTIONS[int(choice) - 1])
+        return False
+    if kind == "installed":
+        info = tool.detect(ctx)
+        ctx.printer.info(f"Current: {info.current or 'not detected'} ({info.source})")
+        ctx.printer.raw("  Managed versions: " + (", ".join(info.versions) or "none"))
+        ctx.printer.raw("  Executable: " + (info.path or "not found"))
+        return False
     if kind == "install":
         cmd_install(ctx, tool.name, None, make_default=True, use_package=False)
         return True
@@ -214,7 +305,7 @@ def _run_tool_action(ctx: Context, lines: Iterator[str], tool: ManagedTool, kind
         cmd_update(ctx, tool.name, all_tools_flag=False)
         return True
     if kind == "switch":
-        version = _pick_version(ctx, lines, tool)
+        version = _pick_installed(ctx, lines, tool)
         scope = _pick_scope(ctx, lines) if version else None
         if version and scope is not None:
             cmd_use(ctx, tool.name, version, scope=scope)
@@ -339,6 +430,61 @@ def _pick_version(ctx: Context, lines: Iterator[str], tool: ManagedTool) -> str 
     return None
 
 
+def _pick_installed(ctx: Context, lines: Iterator[str], tool: ManagedTool) -> str | None:
+    info = tool.detect(ctx)
+    versions = list(info.versions)
+    if info.current and info.current not in versions:
+        versions.append(info.current)
+    ctx.printer.heading(f"{tool.name} / Installed versions")
+    for index, version in enumerate(versions, 1):
+        ctx.printer.raw(f"  {index}  {version}")
+    ctx.printer.raw("  0  back")
+    choice = _ask(ctx, lines, "Installed version")
+    if choice and choice.isdigit() and 1 <= int(choice) <= len(versions):
+        return versions[int(choice) - 1]
+    return None
+
+
+def _backup_menu(ctx: Context, lines: Iterator[str], tool: ManagedTool) -> bool:
+    while True:
+        ctx.printer.heading(
+            f"{tool.name} / Backups", "Native database backups stored privately on this host"
+        )
+        ctx.printer.raw("  1  Create a backup")
+        ctx.printer.raw("  2  List saved backups")
+        ctx.printer.raw("  0  back")
+        choice = _ask(ctx, lines, "Backup action")
+        if choice is None or choice == "0":
+            return False
+        if choice == "2":
+            directory = ctx.paths.state / "backups" / tool.name
+            files = sorted(directory.glob("*")) if directory.is_dir() else []
+            for path in files:
+                if path.is_file() and not path.is_symlink() and not path.name.startswith("."):
+                    ctx.printer.raw(f"  {path.name}  {path.stat().st_size:,} bytes")
+            if not files:
+                ctx.printer.info("No saved backups.")
+        elif choice == "1":
+            database = None
+            if tool.name != "redis":
+                database = _ask(
+                    ctx, lines, "Database name (Enter for all; PostgreSQL requires a name)"
+                )
+                if database is None:
+                    return False
+            client_config = None
+            if tool.name == "mongodb":
+                config_path = _ask(
+                    ctx, lines, "Private mongodump config path (Enter for local defaults)"
+                )
+                if config_path is None:
+                    return False
+                client_config = Path(config_path).expanduser() if config_path else None
+            run_plan(ctx, backup_plan(ctx, tool.name, database or None, client_config))
+        else:
+            ctx.printer.error("Enter a number from the list.")
+
+
 def _pick_scope(ctx: Context, lines: Iterator[str]) -> Scope | None:
     ctx.printer.raw("")
     ctx.printer.raw("  1  for your user (global)")
@@ -359,7 +505,7 @@ def _pick_uninstall_version(ctx: Context, lines: Iterator[str], tool: ManagedToo
     if choice == "1":
         return ""
     if choice == "2":
-        return _pick_version(ctx, lines, tool)
+        return _pick_installed(ctx, lines, tool)
     return None
 
 
@@ -481,6 +627,22 @@ def _shell(ctx: Context, lines: Iterator[str]) -> None:
         cmd_shell(ctx, "remove")
 
 
+def _terminal(ctx: Context, lines: Iterator[str]) -> None:
+    while True:
+        ctx.printer.heading("Terminal studio", "Install and enable only the components you select")
+        for number, (label, _action, _theme) in enumerate(TERMINAL_OPTIONS, 1):
+            ctx.printer.raw(f"  {number:>2}  {label}")
+        ctx.printer.raw("   0  back")
+        choice = _ask(ctx, lines, "Terminal component")
+        if choice is None or choice == "0":
+            return
+        if choice.isdigit() and 1 <= int(choice) <= len(TERMINAL_OPTIONS):
+            _label, action, theme = TERMINAL_OPTIONS[int(choice) - 1]
+            cmd_terminal(ctx, action, theme)
+        else:
+            ctx.printer.error("Choose one component from the list.")
+
+
 _ACTION_LABELS = (
     ("i", "This computer"),
     ("d", "Doctor (offline check)"),
@@ -489,6 +651,7 @@ _ACTION_LABELS = (
     ("m", "Mirrors"),
     ("n", "DNS"),
     ("s", "Shell setup"),
+    ("t", "Terminal studio / Zsh & Starship"),
     ("g", "Update DevForge"),
     ("h", "How to use this menu"),
 )
@@ -501,6 +664,7 @@ _ACTIONS = {
     "m": _mirrors,
     "n": _dns,
     "s": _shell,
+    "t": _terminal,
     "g": _self_update,
     "h": _help,
 }

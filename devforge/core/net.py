@@ -7,6 +7,8 @@ Tests pass a fetcher that never opens a socket.
 from __future__ import annotations
 
 import hashlib
+import os
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -97,9 +99,18 @@ def download(
                 errors.append(f"checksum mismatch for {url}")
                 break
             dest.parent.mkdir(parents=True, exist_ok=True)
-            temporary = dest.with_name(dest.name + ".partial")
-            temporary.write_bytes(payload)
-            temporary.replace(dest)
+            with tempfile.NamedTemporaryFile(
+                dir=dest.parent, prefix=".download-", delete=False
+            ) as f:
+                temporary = Path(f.name)
+                try:
+                    f.write(payload)
+                    f.flush()
+                    os.fsync(f.fileno())
+                    f.close()
+                    temporary.replace(dest)
+                finally:
+                    temporary.unlink(missing_ok=True)
             return
     detail = errors[-1] if errors else "unknown error"
     raise DownloadError(

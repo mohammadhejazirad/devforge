@@ -113,6 +113,7 @@ def test_php_patch_upgrade_refreshes_then_upgrades_same_line(tmp_path):
         "install",
         "-y",
         "--only-upgrade",
+        "--no-remove",
         "php8.5-cli",
         "php8.5-fpm",
     )

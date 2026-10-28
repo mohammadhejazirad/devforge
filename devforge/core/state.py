@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, cast
 
@@ -33,10 +34,20 @@ def load_json(path: Path) -> dict[str, Any]:
 def save_json(path: Path, payload: dict[str, Any]) -> None:
     """Atomically replace ``path``. The previous file is left in place on failure."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
     text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    temporary.write_text(text, encoding="utf-8")
-    os.replace(temporary, path)
+    # A unique, exclusively created file prevents predictable .tmp symlink writes.
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=path.parent, prefix=".state-", delete=False
+    ) as handle:
+        temporary = Path(handle.name)
+        try:
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+            handle.close()
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
 
 
 def backup_file(path: Path) -> Path | None:

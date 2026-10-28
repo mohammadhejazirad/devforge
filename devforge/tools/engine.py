@@ -15,6 +15,7 @@ from devforge.core.pkgmgr import (
     PackageManagerError,
     comparable,
     install,
+    installed_packages,
     lookup_versions,
     refresh,
     remove,
@@ -156,6 +157,16 @@ def install_tool(
     """Plan an install. Passing a version keeps every other version in place."""
     if version:
         require_version(version)
+    if spec.desktop_only and ctx.system().form_factor == "server":
+        return Plan(
+            title=spec.name,
+            blocked="This GUI requires a desktop. Install KVM on the server "
+            "and connect from virt-manager on a desktop over SSH.",
+        )
+    if spec.name == "kvm" and ctx.system().virtualization == "container":
+        return Plan(
+            title=spec.name, blocked="KVM host management is unavailable inside a container."
+        )
     if spec.strategy == "external":
         return Plan(title=spec.name, blocked=spec.notes)
     if spec.strategy == "npm":
@@ -338,6 +349,29 @@ def doctor_tool(spec: ToolSpec, ctx: Context) -> list[Check]:
         )
     else:
         checks.append(Check(spec.name, "warn", "not installed"))
+    if spec.name == "kvm":
+        device = ctx.fs_root / "dev" / "kvm"
+        if not device.exists():
+            checks.append(
+                Check(
+                    "kvm",
+                    "warn",
+                    "No /dev/kvm device. Check CPU virtualization, "
+                    "BIOS/UEFI settings, kernel modules and nested-virtualization support.",
+                )
+            )
+        else:
+            import os
+
+            if not os.access(device, os.R_OK | os.W_OK):
+                checks.append(
+                    Check(
+                        "kvm",
+                        "warn",
+                        "The current user cannot access /dev/kvm. "
+                        "Review the distro's kvm/libvirt permission policy.",
+                    )
+                )
     default = _default_version(spec, ctx)
     if default:
         version_dir = ctx.paths.install_root / spec.name / default
@@ -465,7 +499,15 @@ def _install_package(
                 "The requested version will not be substituted with the distro default."
             ),
         )
-    if _satisfied(spec, info, version, system.family):
+    satisfied = _satisfied(spec, info, version, system.family)
+    if satisfied and spec.name == "kvm":
+        try:
+            satisfied = len(
+                installed_packages(system.package_manager, packages, ctx.runner)
+            ) == len(packages)
+        except PackageManagerError as exc:
+            return Plan(title=spec.name, blocked=str(exc))
+    if satisfied:
         plan = Plan(
             title=spec.name, empty_message=f"{spec.name} is already installed ({info.current})."
         )
@@ -480,7 +522,9 @@ def _install_package(
     reason = f"Installing {spec.name} uses the system package manager."
     plan.add(
         Step(
-            title="Refresh package indexes",
+            title="Check package database"
+            if system.package_manager == "pacman"
+            else "Refresh package indexes",
             kind="command",
             argv=refresh_argv,
             sudo=True,
@@ -502,6 +546,11 @@ def _install_package(
         _add_alternatives(plan, spec, ctx, version)
     elif make_default and spec.shims:
         _add_shims(plan, spec, ctx)
+    if system.package_manager == "pacman":
+        plan.notes.append(
+            "DevForge never runs pacman -Sy (unsafe partial upgrades). "
+            "Run sudo pacman -Syu before managing packages on Arch."
+        )
     plan.steps.extend(shell_steps(ctx))
     _add_group_and_services(plan, spec, ctx)
     if spec.notes:
@@ -793,7 +842,9 @@ def _upgrade_package(spec: ToolSpec, ctx: Context, info: InstalledInfo) -> Plan:
     plan = Plan(title=f"Update {spec.name}")
     plan.add(
         Step(
-            title="Refresh package indexes",
+            title="Check package database"
+            if system.package_manager == "pacman"
+            else "Refresh package indexes",
             kind="command",
             argv=tuple(refresh(system.package_manager)),
             sudo=True,
@@ -819,6 +870,28 @@ def _upgrade_package(spec: ToolSpec, ctx: Context, info: InstalledInfo) -> Plan:
 
 def _remove_packages(spec: ToolSpec, ctx: Context, version: str | None, *, purge: bool) -> Plan:
     system = ctx.system()
+    login_zsh = False
+    if spec.name == "zsh":
+        passwd = ctx.fs_root / "etc" / "passwd"
+        if passwd.is_file():
+            for line in passwd.read_text(encoding="utf-8").splitlines():
+                fields = line.split(":")
+                if len(fields) == 7 and fields[2] == str(ctx.euid):
+                    login_zsh = Path(fields[6]).name == "zsh"
+    if spec.name == "zsh" and (login_zsh or Path(ctx.env.get("SHELL", "")).name == "zsh"):
+        return Plan(
+            title=spec.name,
+            blocked="Zsh is your current login shell. Select another login "
+            "shell before uninstalling it, then log in again.",
+        )
+    if spec.name == "python":
+        return Plan(
+            title=spec.name,
+            blocked="Refusing to remove distro Python: Linux system tools "
+            "may depend on it. Remove user-managed versions with their own version manager.",
+        )
+    if version is None and system.family in spec.versioned_packages:
+        version = detect(spec, ctx).current
     packages = _choose_packages(spec, system.family, version, fallback=False)
     if not packages or not system.package_manager:
         return Plan(
@@ -829,10 +902,53 @@ def _remove_packages(spec: ToolSpec, ctx: Context, version: str | None, *, purge
             ),
         )
     try:
+        packages = tuple(installed_packages(system.package_manager, packages, ctx.runner))
+        if not packages:
+            return Plan(
+                title=spec.name,
+                empty_message="No matching distro packages are installed. "
+                "If the binary came from a manual install, use its original installer.",
+            )
         argv = tuple(remove(system.package_manager, packages, purge=purge))
     except PackageManagerError as exc:
         return Plan(title=spec.name, blocked=str(exc))
     plan = Plan(title=f"Remove {spec.name}")
+    if system.package_manager == "apt":
+        preview = ctx.runner.run(("apt-get", "--simulate", *argv[1:]), timeout=60)
+        if preview.code != 0:
+            plan.blocked = "Package removal simulation failed: " + (
+                preview.stderr or preview.stdout
+            )
+            return plan
+        protected = {
+            "apt",
+            "dpkg",
+            "sudo",
+            "systemd",
+            "libc6",
+            "python3",
+            "openssh-server",
+            "network-manager",
+            "ubuntu-desktop",
+            "linux-image-generic",
+        }
+        removed = {
+            line.split()[1].split(":")[0]
+            for line in preview.stdout.splitlines()
+            if line.startswith("Remv ") and len(line.split()) > 1
+        }
+        risky = (removed & protected) - set(packages)
+        if risky:
+            plan.blocked = "Removal would also remove protected system packages: " + ", ".join(
+                sorted(risky)
+            )
+            return plan
+        if preview.stdout.strip():
+            plan.notes.append("Native package-manager removal preview:\n" + preview.stdout.strip())
+    plan.notes.append(
+        "The package manager may remove dependent packages. Database data and VM disks "
+        "are never deleted by DevForge itself. Keep a verified backup before removal."
+    )
     plan.add(
         Step(
             title=("Purge " if purge else "Remove ") + " ".join(packages),
@@ -1035,6 +1151,13 @@ def _add_group_and_services(plan: Plan, spec: ToolSpec, ctx: Context) -> None:
                 )
             )
     names = spec.services.get(system.family) or spec.services.get("default", ())
+    if spec.name in {"postgresql", "mysql", "mariadb", "mongodb"}:
+        plan.notes.append(
+            "Initialize the database using the distro's documented procedure if this "
+            "is a new data directory, then use the service menu to start it. "
+            "Existing data directories are not initialized or reset by DevForge."
+        )
+        return
     for service in names:
         if _SERVICE.fullmatch(service) is None:
             continue

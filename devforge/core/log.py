@@ -9,7 +9,9 @@ standard library ``logging`` module.
 
 from __future__ import annotations
 
+import os
 import re
+import stat
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,10 +69,16 @@ class FileLog:
             self.path.parent.chmod(0o700)
             if self.path.exists() and self.path.stat().st_size > self.max_bytes:
                 self.path.replace(self.path.with_suffix(self.path.suffix + ".1"))
-            with self.path.open("a", encoding="utf-8") as handle:
+            descriptor = os.open(
+                self.path,
+                os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK,
+                0o600,
+            )
+            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+                    raise OSError("refusing nonregular log file")
+                os.fchmod(handle.fileno(), 0o600)
                 handle.write(line)
-            if self.path.is_file():
-                self.path.chmod(0o600)
         except OSError:
             # Logging must never break the program.
             self.enabled = False

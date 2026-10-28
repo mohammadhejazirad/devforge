@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.4.0 — 2026-10-28
+
+- Make Textual the default UI, with selectable UI themes, safe review dialogs and a plain fallback.
+- Add an opt-in terminal studio for Zsh, pinned history/syntax plugins and individual Zsh/Starship themes.
+- Preserve user shell configuration, keep login-shell changes explicit and isolate the installer UI runtime.
+
+- Add nested category menus, database backup submenus and a refreshed terminal palette.
+- Add private streamed MySQL, MariaDB, PostgreSQL, MongoDB and Redis backups.
+- Add KVM/libvirt and desktop virt-manager package management, and explicit service controls.
+- Add validated Nginx configuration replacement with rollback on validation failure.
+- Harden temporary writes, log symlink handling, isolated launchers and confirmation at EOF.
+- Filter package removal by installed state; preview apt dependencies and protect system Python.
+- Avoid Arch partial upgrades and uninitialized database auto-starts.
+- Preserve NetworkManager DNS settings for restoration and elevate allowed system config writes.
+
 ## 1.3.0 — 2026-10-24
 
 Updates now preserve the active release line. PHP, Python, and Go retain

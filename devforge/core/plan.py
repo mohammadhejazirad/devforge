@@ -150,8 +150,8 @@ def show_plan(plan: Plan, ctx: ApplyContext) -> None:
     ctx.printer.info(s.INFO_PLAN_HEADER.format(count=len(plan.steps)))
     for index, step in enumerate(plan.steps, start=1):
         title = step.title
-        if step.sudo and ctx.euid != 0:
-            title = f"{title} (sudo: {step.reason})"
+        if (step.sudo or (step.path and _privileged_etc(Path(step.path), ctx))) and ctx.euid != 0:
+            title = f"{title} (sudo: {step.reason or 'system configuration requires root'})"
         ctx.printer.plan_line(index, title)
         if step.argv:
             rendered = " ".join(shlex.quote(part) for part in display_argv(step, ctx.euid))
@@ -201,6 +201,16 @@ def _write_json(ctx: ApplyContext, payload: dict[str, object]) -> None:
 
 
 def _apply_step(step: Step, ctx: ApplyContext) -> None:
+    if step.kind == "nginx-config":
+        from devforge.commands.configuration import apply_nginx_config
+
+        apply_nginx_config(step, ctx)
+        return
+    if step.kind == "database-backup":
+        from devforge.core.database import apply_backup
+
+        apply_backup(step, ctx)
+        return
     if step.kind == "verify-install":
         root = Path(step.path)
         if not ctx.paths.contains(root):
@@ -231,13 +241,28 @@ def _apply_step(step: Step, ctx: ApplyContext) -> None:
         path = Path(step.path)
         if not _allowed(path, "etc", ctx) and not ctx.paths.contains(path):
             raise ValueError(f"refusing to back up {path}")
-        backup_file(path)
+        if _privileged_etc(path, ctx):
+            _etc_backup(path, ctx)
+        else:
+            backup_file(path)
         return
     if step.kind == "restore":
         path = Path(step.path)
         if not _allowed(path, "etc", ctx) and not ctx.paths.contains(path):
             raise ValueError(f"refusing to restore {path}")
-        if not restore_backup(path):
+        if _privileged_etc(path, ctx):
+            backup = Path(str(path) + ".devforge.bak")
+            _run_command(
+                Step(
+                    title=f"Restore {path}",
+                    kind="command",
+                    argv=("cp", "-a", "--remove-destination", "--", str(backup), str(path)),
+                    sudo=True,
+                    reason="Restoring system configuration needs root.",
+                ),
+                ctx,
+            )
+        elif not restore_backup(path):
             raise StateError(f"no backup exists for {path}")
         return
     if step.kind == "group":
@@ -342,8 +367,29 @@ def _run_command(step: Step, ctx: ApplyContext) -> None:
         env = dict(ctx.env)
         env.update(dict(step.env))
     result = ctx.runner.run(argv, timeout=600, env=env)
+    if result.code == 0 and not ctx.as_json:
+        from devforge.core.log import redact
+
+        for output in (result.stdout, result.stderr):
+            if output.strip():
+                ctx.printer.raw(redact(output.strip()))
     if result.code != 0:
         detail = (result.stderr or result.stdout).strip()
+        from devforge.core.log import redact
+
+        detail = redact(detail)
+        lower = detail.lower()
+        if "lock" in lower:
+            detail += (
+                " Wait for the other package-manager process to finish; do not delete lock files."
+            )
+        elif "permission denied" in lower or "authentication" in lower:
+            detail += " Check sudo privileges and service credentials."
+        elif "unable to locate package" in lower or "no match" in lower:
+            detail += " Check the package name and enabled distro repositories."
+        elif result.code == 124:
+            detail += " The command timed out. Inspect package/service state before retrying."
+
         raise OSError(
             s.ERR_FAILED.format(action=step.title, code=result.code)
             + (f" {detail}" if detail else "")
@@ -388,12 +434,84 @@ def _write_step(step: Step, ctx: ApplyContext) -> None:
     path = Path(step.path)
     if not _allowed(path, step.policy, ctx):
         raise ValueError(f"refusing to write {path}")
+    if step.policy == "etc" and path.is_symlink():
+        raise ValueError(f"Refusing to overwrite symlinked system configuration: {path}")
+    if _privileged_etc(path, ctx):
+        _etc_write(path, step.content, ctx)
+        return
     if path.exists() or path.is_symlink():
         backup_file(path)
+    import tempfile
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(step.content, encoding="utf-8")
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o600
     if step.fmt == "executable":
-        path.chmod(0o755)
+        mode = 0o755
+    with tempfile.NamedTemporaryFile(
+        mode="w", encoding="utf-8", dir=path.parent, prefix=".config-", delete=False
+    ) as f:
+        temporary = Path(f.name)
+        try:
+            f.write(step.content)
+            f.flush()
+            os.fsync(f.fileno())
+            f.close()
+            temporary.chmod(mode)
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+def _privileged_etc(path: Path, ctx: ApplyContext) -> bool:
+    return ctx.euid != 0 and ctx.fs_root == Path("/") and _allowed(path, "etc", ctx)
+
+
+def _etc_backup(path: Path, ctx: ApplyContext) -> None:
+    backup = Path(str(path) + ".devforge.bak")
+    if backup.exists() or backup.is_symlink() or not (path.exists() or path.is_symlink()):
+        return
+    _run_command(
+        Step(
+            title=f"Back up {path}",
+            kind="command",
+            argv=("cp", "-a", "--no-clobber", "--", str(path), str(backup)),
+            sudo=True,
+            reason="Backing up system configuration needs root.",
+        ),
+        ctx,
+    )
+
+
+def _etc_write(path: Path, content: str, ctx: ApplyContext) -> None:
+    import tempfile
+
+    if path.is_symlink():
+        raise ValueError(f"Refusing to overwrite symlinked configuration: {path}")
+    _etc_backup(path, ctx)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as f:
+        f.write(content)
+        f.flush()
+        _run_command(
+            Step(
+                title=f"Create {path.parent}",
+                kind="command",
+                argv=("install", "-d", "--", str(path.parent)),
+                sudo=True,
+                reason="Creating a system config directory needs root.",
+            ),
+            ctx,
+        )
+        mode = oct(path.stat().st_mode & 0o777)[2:] if path.exists() else "644"
+        _run_command(
+            Step(
+                title=f"Write {path}",
+                kind="command",
+                argv=("install", "-m", mode, "--", f.name, str(path)),
+                sudo=True,
+                reason="Writing system configuration needs root.",
+            ),
+            ctx,
+        )
 
 
 def _delete_step(step: Step, ctx: ApplyContext) -> None:
@@ -451,12 +569,13 @@ def _allowed(path: Path, policy: str, ctx: ApplyContext) -> bool:
     if policy == "project":
         try:
             return path.parent.resolve() == ctx.cwd.resolve() and path.name in PIN_NAMES
-        except OSError:
+        except (OSError, RuntimeError):
             return False
     if policy == "etc":
         allowed = {
             os.path.abspath(ctx.fs_root / "etc" / "resolv.conf"),
             os.path.abspath(ctx.fs_root / "etc" / "docker" / "daemon.json"),
+            os.path.abspath(ctx.fs_root / "etc" / "nginx" / "nginx.conf"),
         }
         return os.path.abspath(path) in allowed
     return False
@@ -467,7 +586,7 @@ def _under(path: Path, root: Path) -> bool:
     try:
         target = path.expanduser().resolve()
         resolved = root.expanduser().resolve()
-    except OSError:
+    except (OSError, RuntimeError):
         return False
     return target != resolved and resolved in target.parents
 

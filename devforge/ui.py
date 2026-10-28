@@ -21,8 +21,8 @@ _CODES = {
     "ok": "\x1b[32m",
     "warn": "\x1b[33m",
     "err": "\x1b[31m",
-    "info": "\x1b[36m",
-    "step": "\x1b[1;36m",
+    "info": "\x1b[38;5;75m",
+    "step": "\x1b[1;38;5;141m",
     "detail": "\x1b[2m",
     "emphasis": "\x1b[1m",
 }
@@ -100,6 +100,14 @@ class Printer:
         if not self.quiet:
             self._emit(text)
 
+    def heading(self, title: str, subtitle: str = "") -> None:
+        if not self.quiet:
+            self._emit("+" + "-" * 66 + "+", style="detail")
+            self._emit("  " + title, style="step")
+            if subtitle:
+                self._emit("  " + subtitle, style="detail")
+            self._emit("+" + "-" * 66 + "+", style="detail")
+
     def info(self, text: str) -> None:
         if not self.quiet:
             self._emit(f"{s.MARK_INFO} {text}", style="info")
@@ -130,7 +138,7 @@ class Printer:
         if self.verbose >= 1:
             self.detail("$ " + " ".join(argv))
 
-    def confirm(self, question: str = s.PROMPT_CONFIRM, *, default: bool = True) -> bool:
+    def confirm(self, question: str = s.PROMPT_CONFIRM, *, default: bool = False) -> bool:
         """Ask a yes/no question. Returns the default when confirmation is skipped."""
         if self.assume_yes:
             return True
@@ -147,7 +155,7 @@ class Printer:
         try:
             answer = input().strip().lower()
         except EOFError:
-            return default
+            return False
         if not answer:
             return default
         return answer in {"y", "yes"}

@@ -59,7 +59,16 @@ class ManagedTool:
         return use_tool(self.spec, ctx, version, scope)
 
     def uninstall(self, ctx: Context, version: str | None, *, purge: bool) -> Plan:
-        return uninstall_tool(self.spec, ctx, version, purge=purge)
+        plan = uninstall_tool(self.spec, ctx, version, purge=purge)
+        if self.name == "starship" and not plan.blocked:
+            from devforge.core.state import load_json
+            from devforge.core.terminal import terminal_plan
+            from devforge.tools.engine import merge_plans
+
+            settings = load_json(ctx.paths.config / "terminal.json")
+            if settings.get("prompt") == "starship":
+                return merge_plans(plan.title, [terminal_plan(ctx, "reset-prompt"), plan])
+        return plan
 
     def doctor(self, ctx: Context) -> list[Check]:
         return doctor_tool(self.spec, ctx)

@@ -86,7 +86,7 @@ def test_menu_installs_every_extension_when_enter_is_pressed(tmp_path: Path) -> 
     number = next(
         index for index, item in enumerate(options, start=1) if item[1] == "php-extensions"
     )
-    assert menu(ctx, iter(["1", str(number), "", "", "0"])) == 0
+    assert menu(ctx, iter(["1", "1", str(number), "", "", "0"])) == 0
     text = out.getvalue()
     assert "PHP 8.3.6 extensions" in text
     assert "Install all extensions (default)" in text
@@ -104,7 +104,7 @@ def test_menu_category_default_installs_only_that_category(tmp_path: Path) -> No
     number = next(
         index for index, item in enumerate(options, start=1) if item[1] == "php-extensions"
     )
-    assert menu(ctx, iter(["1", str(number), "2", "", "", "0"])) == 0
+    assert menu(ctx, iter(["1", "1", str(number), "2", "", "", "0"])) == 0
     text = out.getvalue()
     assert "php8.3-mysql" in text
     assert "php8.3-pgsql" in text

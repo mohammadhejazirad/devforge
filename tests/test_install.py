@@ -17,7 +17,7 @@ from devforge import __version__
 
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "install.sh"
-RELEASE = "1.3.0"
+RELEASE = __version__
 
 
 def _pinned_sha() -> str:
@@ -108,6 +108,7 @@ def _serve(directory: Path) -> int:
 
 def _run_installer(prefix: Path, port: int, digest: str) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
+    env["DEVFORGE_INSTALL_TUI"] = "0"
     env["DEVFORGE_PREFIX"] = str(prefix)
     env["DEVFORGE_RELEASE_URL"] = f"http://127.0.0.1:{port}/devforge-{RELEASE}.tar.gz"
     env["DEVFORGE_RELEASE_SHA256"] = digest
@@ -153,6 +154,7 @@ def test_old_python_does_not_install_packages(tmp_path: Path) -> None:
     prefix = tmp_path / "opt"
     env = os.environ.copy()
     env["PATH"] = f"{bindir}:{env.get('PATH', '')}"
+    env["DEVFORGE_INSTALL_TUI"] = "0"
     env["DEVFORGE_PREFIX"] = str(prefix)
     env["DEVFORGE_RELEASE_URL"] = f"http://127.0.0.1:{port}/devforge-{RELEASE}.tar.gz"
     env["DEVFORGE_RELEASE_SHA256"] = digest
@@ -187,6 +189,7 @@ def test_installer_bootstraps_without_download_hash_or_archive_utilities(tmp_pat
     env = dict(
         os.environ,
         PATH=str(bindir),
+        DEVFORGE_INSTALL_TUI="0",
         DEVFORGE_PREFIX=str(prefix),
         DEVFORGE_RELEASE_URL=f"http://127.0.0.1:{port}/devforge-{RELEASE}.tar.gz",
         DEVFORGE_RELEASE_SHA256=digest,

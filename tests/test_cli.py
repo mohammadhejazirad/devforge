@@ -131,5 +131,5 @@ def test_module_help_subprocess() -> None:
 
 def test_version_matches_pyproject() -> None:
     pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert "dependencies = []" in pyproject
+    assert '"textual>=8.2,<9"' in pyproject
     assert f'version = "{__version__}"' in pyproject

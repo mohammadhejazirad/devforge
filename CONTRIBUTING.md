@@ -9,8 +9,8 @@ both files must stay in sync when the spec changes.
 - All user-facing program text is English only, including menus, prompts,
   errors, and `--help`. Docs may be bilingual; the program is not.
 - Terminal only. Do not add GUI dependencies, on desktop or server.
-- Python 3.9+ with the standard library only on the runtime path. Do not add a
-  runtime dependency without discussion; dev-only tools are fine.
+- Python 3.9+. Core CLI and recovery commands use the standard library.
+  Textual is the approved full-screen UI dependency; keep its imports lazy.
 - Be distro-agnostic. Never hardcode "Ubuntu" or any single distribution;
   detect from `/etc/os-release` and `uname -m`.
 - Use `subprocess` with argument lists. Never use `shell=True` with
